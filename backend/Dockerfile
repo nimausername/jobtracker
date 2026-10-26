@@ -4,18 +4,16 @@ FROM node:20-alpine AS base
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 
-FROM base AS deps
+FROM base AS build
+# Coolify injects NODE_ENV=production via build-arg; that skips devDependencies (typescript).
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
-# Inline NODE_ENV: Coolify passes --build-arg NODE_ENV=production, which would
-# skip devDependencies (typescript) and break `tsc`.
-RUN NODE_ENV=development pnpm install --frozen-lockfile --filter @jobtracker/backend...
+RUN pnpm install --frozen-lockfile --filter @jobtracker/backend... --config.production=false
 
-FROM base AS build
-COPY --from=deps /app/ ./
 COPY backend ./backend
-RUN NODE_ENV=development pnpm --filter @jobtracker/backend build \
+RUN pnpm install --frozen-lockfile --filter @jobtracker/backend... --config.production=false \
+  && pnpm --filter @jobtracker/backend build \
   && pnpm --filter @jobtracker/backend deploy --prod /deploy
 
 FROM node:20-alpine AS runner
