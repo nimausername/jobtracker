@@ -16,6 +16,7 @@ build/
 .next/
 out/
 coverage/
+.deploy-backend/
 
 # Logs and caches
 *.log

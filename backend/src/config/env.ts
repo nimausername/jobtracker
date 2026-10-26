@@ -11,12 +11,15 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4000),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   /** Optional shared parent domain for auth cookies, e.g. `.nimakhabbazi.de`. */
-  COOKIE_DOMAIN: z.string().min(1).optional(),
+  COOKIE_DOMAIN: z
+    .string()
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
   /** Force Secure cookies outside production (useful behind HTTPS reverse proxies). */
   COOKIE_SECURE: z
-    .enum(["true", "false"])
+    .enum(["true", "false", ""])
     .optional()
-    .transform((value) => value === "true"),
+    .transform((value) => (value === "true" ? true : value === "false" ? false : undefined)),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   KEYCLOAK_URL: z.string().url(),
   KEYCLOAK_REALM: z.string().min(1),
