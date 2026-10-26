@@ -120,11 +120,11 @@ export const RegisterForm = () => {
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="new-password"
             minLength={8}
-            description="At least 8 characters."
+            description="At least 8 characters, including a letter and a number."
             disabled={isSubmitting}
           />
 
-          <Field orientation="horizontal" className="items-start">
+          <div className="flex items-start gap-3">
             <Checkbox
               id="register-legal"
               checked={acceptedLegal}
@@ -132,13 +132,15 @@ export const RegisterForm = () => {
               required
               aria-required="true"
               disabled={isSubmitting}
-              aria-label="Accept Terms of Service and Privacy Policy"
+              className="mt-0.5"
+              aria-label={`Confirm I am at least ${SITE_INFO.minAge} and accept Terms of Service and Privacy Policy`}
             />
-            <FieldLabel
+            <label
               htmlFor="register-legal"
-              className="text-sm font-normal leading-snug text-muted-foreground"
+              className="min-w-0 flex-1 text-sm leading-relaxed font-normal text-muted-foreground"
             >
-              I agree to the{" "}
+              I confirm I am at least {SITE_INFO.minAge} years old and agree to
+              the{" "}
               <Link
                 href="/terms"
                 className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
@@ -157,8 +159,8 @@ export const RegisterForm = () => {
                 Privacy Policy
               </Link>
               .
-            </FieldLabel>
-          </Field>
+            </label>
+          </div>
         </FieldGroup>
 
         {error ? <FieldError>{error}</FieldError> : null}

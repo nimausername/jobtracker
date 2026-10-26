@@ -160,11 +160,18 @@ const PrivacyPage = () => {
         </p>
       </LegalSection>
 
-      <LegalSection id="audience" title="9. Audience">
+      <LegalSection id="audience" title="9. Children and age limit">
         <p>
-          Job Tracker is a job-application tracker. There is no fixed minimum
-          age stated for the service. By registering you confirm you have the
-          legal capacity to agree to the Terms and Privacy Policy.
+          The hosted service is intended only for users who are at least{" "}
+          {SITE_INFO.minAge} years old (aligned with the GDPR default age of
+          digital consent in Germany). Do not register or use the service if you
+          are under {SITE_INFO.minAge}. We do not knowingly collect personal data
+          from children under {SITE_INFO.minAge}. If you believe we have done so,
+          contact{" "}
+          <a href={`mailto:${SITE_INFO.contactEmail}`}>
+            {SITE_INFO.contactEmail}
+          </a>{" "}
+          and we will delete the data.
         </p>
       </LegalSection>
 

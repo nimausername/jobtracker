@@ -9,7 +9,7 @@ describe("auth schemas", () => {
       password: "password123",
       name: "Nima",
       acceptedLegal: true,
-      documentsVersion: "2026-10-26.2",
+      documentsVersion: "2026-10-26.3",
     });
 
     expect(parsed.email).toBe("nima@example.com");
@@ -21,7 +21,7 @@ describe("auth schemas", () => {
       email: "nima@example.com",
       password: "password123",
       acceptedLegal: false,
-      documentsVersion: "2026-10-26.2",
+      documentsVersion: "2026-10-26.3",
     });
 
     expect(result.success).toBe(false);
@@ -32,7 +32,29 @@ describe("auth schemas", () => {
       email: "nima@example.com",
       password: "short",
       acceptedLegal: true,
-      documentsVersion: "2026-10-26.2",
+      documentsVersion: "2026-10-26.3",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects passwords without a digit", () => {
+    const result = registerBodySchema.safeParse({
+      email: "nima@example.com",
+      password: "passwordonly",
+      acceptedLegal: true,
+      documentsVersion: "2026-10-26.3",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects passwords without a letter", () => {
+    const result = registerBodySchema.safeParse({
+      email: "nima@example.com",
+      password: "12345678",
+      acceptedLegal: true,
+      documentsVersion: "2026-10-26.3",
     });
 
     expect(result.success).toBe(false);

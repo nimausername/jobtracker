@@ -6,6 +6,7 @@ import type { Database } from "./db/client.js";
 import { AppError, ErrorCode } from "./lib/errors.js";
 import { resolveRequestId } from "./lib/request-id.js";
 import { authPlugin } from "./plugins/auth.js";
+import { securityPlugin } from "./plugins/security.js";
 import { AccountRepository } from "./repositories/account-repository.js";
 import { ApplicationsRepository } from "./repositories/applications-repository.js";
 import { LegalAcceptancesRepository } from "./repositories/legal-acceptances-repository.js";
@@ -28,6 +29,13 @@ export type AppDeps = {
   readonly db: Database;
 };
 
+type RateLimitErrorShape = {
+  readonly statusCode?: number;
+  readonly code?: string;
+  readonly message?: string;
+  readonly retryAfterSeconds?: number;
+};
+
 /**
  * Builds the Fastify application with shared plugins and routes.
  */
@@ -36,6 +44,10 @@ export const buildApp = async (deps: AppDeps) => {
     logger: {
       level: deps.env.NODE_ENV === "production" ? "info" : "debug",
     },
+    // Coolify / reverse proxy: use X-Forwarded-* for client IP (rate limits).
+    trustProxy: true,
+    // Cap JSON bodies to reduce abuse via oversized payloads.
+    bodyLimit: 64 * 1024,
     genReqId: (request) => resolveRequestId(request.headers["x-request-id"]),
   });
 
@@ -60,6 +72,7 @@ export const buildApp = async (deps: AppDeps) => {
     credentials: true,
   });
 
+  await app.register(securityPlugin);
   await app.register(authPlugin, { authService });
 
   app.addHook("onRequest", async (request, reply) => {
@@ -68,11 +81,36 @@ export const buildApp = async (deps: AppDeps) => {
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof AppError) {
+      if (error.retryAfterSeconds !== undefined) {
+        void reply.header("Retry-After", String(error.retryAfterSeconds));
+      }
+
       return reply.status(error.statusCode).send({
         error: {
           code: error.code,
           message: error.message,
           details: error.details,
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    const rateLimitError = error as RateLimitErrorShape;
+    if (rateLimitError.statusCode === 429) {
+      const retryAfterSeconds = rateLimitError.retryAfterSeconds;
+      if (retryAfterSeconds !== undefined) {
+        void reply.header("Retry-After", String(retryAfterSeconds));
+      }
+
+      return reply.status(429).send({
+        error: {
+          code: ErrorCode.RATE_LIMITED,
+          message:
+            rateLimitError.message ??
+            "Too many requests. Please slow down and try again.",
+          details: [],
         },
         meta: {
           requestId: request.id,

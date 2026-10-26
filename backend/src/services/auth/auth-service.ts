@@ -107,4 +107,11 @@ export class AuthService {
   async refresh(refreshToken: string): Promise<TokenResponse> {
     return this.tokenClient.refresh(refreshToken);
   }
+
+  /**
+   * Revokes the Keycloak session associated with a refresh token.
+   */
+  async logout(refreshToken: string): Promise<void> {
+    await this.tokenClient.logout(refreshToken);
+  }
 }

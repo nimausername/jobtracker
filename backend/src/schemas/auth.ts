@@ -1,12 +1,22 @@
 import { z } from "zod";
 
 /**
+ * Registration passwords: 8–128 chars, at least one letter and one digit.
+ */
+export const registerPasswordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password must be at most 128 characters")
+  .regex(/[A-Za-z]/, "Password must include a letter")
+  .regex(/[0-9]/, "Password must include a number");
+
+/**
  * Registration request body.
  * `acceptedLegal` must be true; `documentsVersion` must match published legal docs.
  */
 export const registerBodySchema = z.object({
   email: z.string().email().max(255),
-  password: z.string().min(8).max(128),
+  password: registerPasswordSchema,
   name: z.string().trim().min(1).max(120).optional(),
   acceptedLegal: z.literal(true, {
     errorMap: () => ({

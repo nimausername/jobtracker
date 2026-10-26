@@ -53,10 +53,10 @@ const TermsPage = () => {
 
       <LegalSection id="eligibility" title="3. Accounts">
         <p>
-          There is no fixed minimum age for this job-tracking service. By
-          registering you confirm you have legal capacity to accept these Terms.
-          Keep your credentials confidential; you are responsible for activity
-          under your account.
+          You must be at least {SITE_INFO.minAge} years old to create an account
+          and use the hosted service. By registering you confirm that you meet
+          this age requirement and can accept these Terms. Keep your credentials
+          confidential; you are responsible for activity under your account.
         </p>
       </LegalSection>
 

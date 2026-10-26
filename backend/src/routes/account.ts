@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 
 import { clearAuthCookies } from "../lib/auth-cookies.js";
 import { parseOrThrow } from "../lib/validate.js";
+import { accountRateLimits } from "../plugins/security.js";
 import { deleteAccountBodySchema } from "../schemas/account.js";
 import type { AccountService } from "../services/account/account-service.js";
 
@@ -20,6 +21,9 @@ export const accountRoutes: FastifyPluginAsync<AccountRouteOptions> = async (
     "/account/export",
     {
       preHandler: [app.authenticate],
+      config: {
+        rateLimit: accountRateLimits.export,
+      },
     },
     async (request) => {
       const data = await opts.accountService.exportData(request.user);
@@ -35,6 +39,9 @@ export const accountRoutes: FastifyPluginAsync<AccountRouteOptions> = async (
     "/account",
     {
       preHandler: [app.authenticate],
+      config: {
+        rateLimit: accountRateLimits.delete,
+      },
     },
     async (request, reply) => {
       parseOrThrow(deleteAccountBodySchema, request.body);

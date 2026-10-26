@@ -79,6 +79,34 @@ export class KeycloakTokenClient {
     return this.toTokenResponse(json);
   }
 
+  /**
+   * Revokes the refresh token (and associated session) at Keycloak.
+   * Best-effort: failures are swallowed by the caller so local logout still succeeds.
+   */
+  async logout(refreshToken: string): Promise<void> {
+    const body = new URLSearchParams({
+      client_id: this.env.KEYCLOAK_CLIENT_ID,
+      client_secret: this.env.KEYCLOAK_CLIENT_SECRET,
+      refresh_token: refreshToken,
+    });
+
+    const response = await fetch(this.urls.logoutUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+    });
+
+    if (!response.ok && response.status !== 204) {
+      throw new AppError(
+        "INTERNAL",
+        "Failed to revoke session at identity provider",
+        502,
+      );
+    }
+  }
+
   private async requestToken(
     body: URLSearchParams,
   ): Promise<KeycloakTokenJson> {

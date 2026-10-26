@@ -17,8 +17,8 @@ const HomePage = () => {
       className="h-dvh max-h-dvh overflow-hidden"
       contentClassName="h-full min-h-0"
     >
-      <div className="flex h-full min-h-0 w-full flex-col px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
-        <section className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
+      <div className="flex h-full min-h-0 w-full flex-col pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <section className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center sm:px-6">
           <div className="flex w-full max-w-3xl flex-col items-center">
             <Badge
               variant="outline"
@@ -66,7 +66,7 @@ const HomePage = () => {
           </div>
         </section>
 
-        <SiteFooter compact className="shrink-0 border-t-0 pt-2" />
+        <SiteFooter />
       </div>
     </GradientAsciiBackground>
   );

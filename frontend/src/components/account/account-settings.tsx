@@ -5,26 +5,17 @@ import { useRouter } from "next/navigation";
 import {
   DownloadIcon,
   LoaderCircleIcon,
-  ShieldCheckIcon,
   Trash2Icon,
-  TriangleAlertIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/reui/alert";
 import { Badge } from "@/components/reui/badge";
 import {
   Frame,
-  FrameDescription,
-  FrameHeader,
   FramePanel,
-  FrameTitle,
 } from "@/components/reui/frame";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,7 +27,6 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import {
   deleteAccountRequest,
   exportAccountRequest,
@@ -45,8 +35,21 @@ import { ApiError } from "@/lib/api/client";
 
 const DELETE_CONFIRMATION = "DELETE";
 
+const getInitials = (name?: string | null, email?: string | null): string => {
+  if (name?.trim()) {
+    return name
+      .split(/\s+/)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  return email?.slice(0, 2).toUpperCase() || "JT";
+};
+
 /**
- * Account settings: profile summary, data export, and account deletion.
+ * Account settings — profile identity with export and delete actions.
  */
 export const AccountSettings = () => {
   const router = useRouter();
@@ -56,8 +59,9 @@ export const AccountSettings = () => {
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const displayName = user?.name?.trim() || "Not set";
-  const displayEmail = user?.email ?? "Not available";
+  const displayName = user?.name?.trim() || "Account";
+  const displayEmail = user?.email ?? "Email unavailable";
+  const initials = getInitials(user?.name, user?.email);
   const canDelete = deleteConfirm === DELETE_CONFIRMATION;
 
   const handleExport = async () => {
@@ -117,116 +121,90 @@ export const AccountSettings = () => {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <div className="space-y-1">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <div className="min-w-0">
         <h1 className="font-heading text-2xl font-semibold tracking-tight">
           Account
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your profile, download your data, or permanently delete your
-          account.
+        <p className="mt-1 text-sm text-muted-foreground">
+          Your profile, data export, and account controls.
         </p>
       </div>
 
-      <Frame>
-        <FrameHeader>
-          <FrameTitle>Profile</FrameTitle>
-          <FrameDescription>
-            Details from your Job Tracker sign-in.
-          </FrameDescription>
-        </FrameHeader>
-        <FramePanel className="space-y-4">
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1">
-              <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Name
-              </dt>
-              <dd className="text-sm font-medium">{displayName}</dd>
+      <Frame stacked spacing="sm" className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200 motion-reduce:animate-none">
+        <FramePanel className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <Avatar className="size-12 rounded-xl">
+              <AvatarFallback className="rounded-xl text-sm font-medium">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-sm font-semibold tracking-tight">
+                  {displayName}
+                </p>
+                <Badge variant="success-light" size="sm">
+                  Active
+                </Badge>
+              </div>
+              <p className="truncate text-sm text-muted-foreground">
+                {displayEmail}
+              </p>
             </div>
-            <div className="space-y-1">
-              <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Email
-              </dt>
-              <dd className="text-sm font-medium break-all">{displayEmail}</dd>
-            </div>
-          </dl>
-          <Separator />
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="success-light" size="sm">
-              Signed in
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              Session cookies are httpOnly and not readable by page scripts.
-            </span>
           </div>
         </FramePanel>
-      </Frame>
 
-      <Frame>
-        <FrameHeader>
-          <FrameTitle>Your data</FrameTitle>
-          <FrameDescription>
-            Export a JSON copy of your applications, notes, and acceptance
-            records.
-          </FrameDescription>
-        </FrameHeader>
-        <FramePanel className="space-y-4">
-          <Alert variant="info">
-            <ShieldCheckIcon aria-hidden="true" />
-            <AlertTitle>Portable export</AlertTitle>
-            <AlertDescription>
-              The file includes your profile, job applications, timeline notes,
-              and legal acceptance history for this account.
-            </AlertDescription>
-          </Alert>
+        <FramePanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-medium tracking-tight">Export your data</p>
+            <p className="text-sm text-muted-foreground">
+              Download applications, notes, and acceptance records as JSON.
+            </p>
+          </div>
           <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => void handleExport()}
             disabled={isExporting}
             aria-busy={isExporting}
-            className="w-full sm:w-auto"
+            className="w-full shrink-0 sm:w-auto"
           >
             {isExporting ? (
               <>
                 <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
-                Preparing export…
+                Preparing…
               </>
             ) : (
               <>
                 <DownloadIcon aria-hidden="true" />
-                Download my data
+                Download JSON
               </>
             )}
           </Button>
         </FramePanel>
-      </Frame>
 
-      <Frame>
-        <FrameHeader>
-          <FrameTitle>Danger zone</FrameTitle>
-          <FrameDescription>
-            Permanently delete your account and all related Job Tracker data.
-          </FrameDescription>
-        </FrameHeader>
-        <FramePanel className="space-y-4">
-          <Alert variant="destructive">
-            <TriangleAlertIcon aria-hidden="true" />
-            <AlertTitle>This cannot be undone</AlertTitle>
-            <AlertDescription>
-              Deleting removes your applications, notes, acceptance records, and
-              Keycloak login for this service. There are currently no backups to
-              restore from.
-            </AlertDescription>
-          </Alert>
+        <FramePanel className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-medium tracking-tight text-destructive-foreground dark:text-destructive">
+              Delete account
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Permanently remove your login and all Job Tracker data. This
+              cannot be undone.
+            </p>
+          </div>
           <Button
             type="button"
             variant="destructive"
+            size="sm"
             onClick={() => setDeleteOpen(true)}
-            className="w-full sm:w-auto"
+            className="w-full shrink-0 sm:w-auto"
             aria-label="Delete account"
           >
             <Trash2Icon aria-hidden="true" />
-            Delete account
+            Delete
           </Button>
         </FramePanel>
       </Frame>
@@ -236,8 +214,12 @@ export const AccountSettings = () => {
           <DialogHeader>
             <DialogTitle>Delete your account?</DialogTitle>
             <DialogDescription>
-              Type <span className="font-mono font-medium text-foreground">{DELETE_CONFIRMATION}</span>{" "}
-              to confirm. Your account and data will be removed permanently.
+              Type{" "}
+              <span className="font-mono font-medium text-foreground">
+                {DELETE_CONFIRMATION}
+              </span>{" "}
+              to confirm. Applications, notes, and your login will be removed
+              permanently.
             </DialogDescription>
           </DialogHeader>
           <Field>

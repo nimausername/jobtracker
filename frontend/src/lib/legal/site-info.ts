@@ -30,8 +30,12 @@ export const SITE_INFO = {
   logRetention: "server logs are cleared every 6 months",
   backups: "No automated backups are currently configured.",
   taxStatus: "No VAT ID or commercial tax registration applies; the project generates no income.",
+  /**
+   * Minimum age for the hosted service (GDPR Art. 8 default in Germany: 16).
+   */
+  minAge: 16,
   /** Bump when Privacy/Terms/Cookies materially change; must match backend. */
-  documentsVersion: "2026-10-26.2",
+  documentsVersion: "2026-10-26.3",
   lastUpdated: "2026-10-26",
   lastUpdatedLabel: "26 October 2026",
 } as const;

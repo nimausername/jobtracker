@@ -6,8 +6,14 @@ import {
   readAuthCookies,
   setAuthCookies,
 } from "../lib/auth-cookies.js";
-import { badRequest } from "../lib/errors.js";
+import { resolveClientIp } from "../lib/client-ip.js";
+import { AppError, badRequest, ErrorCode } from "../lib/errors.js";
+import {
+  loginThrottle,
+  loginThrottleKey,
+} from "../lib/login-throttle.js";
 import { parseOrThrow } from "../lib/validate.js";
+import { authRateLimits } from "../plugins/security.js";
 import {
   loginBodySchema,
   registerBodySchema,
@@ -38,71 +44,124 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
   app,
   opts,
 ) => {
-  app.post("/auth/register", async (request, reply) => {
-    const body = parseOrThrow(registerBodySchema, request.body);
-    const forwardedFor = request.headers["x-forwarded-for"];
-    const ipAddress =
-      typeof forwardedFor === "string"
-        ? forwardedFor.split(",")[0]?.trim()
-        : request.ip;
-    const userAgentHeader = request.headers["user-agent"];
-    const userAgent =
-      typeof userAgentHeader === "string" ? userAgentHeader : undefined;
+  app.post(
+    "/auth/register",
+    {
+      config: {
+        rateLimit: authRateLimits.register,
+      },
+    },
+    async (request, reply) => {
+      const body = parseOrThrow(registerBodySchema, request.body);
+      const ipAddress = resolveClientIp(request);
+      const userAgentHeader = request.headers["user-agent"];
+      const userAgent =
+        typeof userAgentHeader === "string" ? userAgentHeader : undefined;
 
-    const tokens = await opts.authService.register({
-      email: body.email,
-      password: body.password,
-      acceptedLegal: body.acceptedLegal,
-      documentsVersion: body.documentsVersion,
-      ...(body.name ? { name: body.name } : {}),
-      ...(ipAddress ? { ipAddress } : {}),
-      ...(userAgent ? { userAgent } : {}),
-    });
+      const tokens = await opts.authService.register({
+        email: body.email,
+        password: body.password,
+        acceptedLegal: body.acceptedLegal,
+        documentsVersion: body.documentsVersion,
+        ...(body.name ? { name: body.name } : {}),
+        ...(ipAddress ? { ipAddress } : {}),
+        ...(userAgent ? { userAgent } : {}),
+      });
 
-    setAuthCookies(reply, tokens, app.env);
+      setAuthCookies(reply, tokens, app.env);
 
-    return reply.status(201).send({
-      data: toAuthSession(tokens),
-      meta: { requestId: request.id },
-    });
-  });
+      return reply.status(201).send({
+        data: toAuthSession(tokens),
+        meta: { requestId: request.id },
+      });
+    },
+  );
 
-  app.post("/auth/login", async (request, reply) => {
-    const body = parseOrThrow(loginBodySchema, request.body);
-    const tokens = await opts.authService.login(body);
-    setAuthCookies(reply, tokens, app.env);
+  app.post(
+    "/auth/login",
+    {
+      config: {
+        rateLimit: authRateLimits.login,
+      },
+    },
+    async (request, reply) => {
+      const body = parseOrThrow(loginBodySchema, request.body);
+      const ip = resolveClientIp(request);
+      const throttleKey = loginThrottleKey(body.email, ip);
 
-    return {
-      data: toAuthSession(tokens),
-      meta: { requestId: request.id },
-    };
-  });
+      loginThrottle.assertAllowed(throttleKey);
 
-  app.post("/auth/refresh", async (request, reply) => {
-    const body = parseOrThrow(refreshBodySchema, request.body ?? {});
-    const cookieRefresh = readAuthCookies(request).refreshToken;
-    const refreshToken = body.refreshToken ?? cookieRefresh;
+      try {
+        const tokens = await opts.authService.login(body);
+        loginThrottle.recordSuccess(throttleKey);
+        setAuthCookies(reply, tokens, app.env);
 
-    if (!refreshToken) {
-      throw badRequest("Refresh token missing", [
-        { field: "refreshToken", reason: "REQUIRED" },
-      ]);
-    }
+        return {
+          data: toAuthSession(tokens),
+          meta: { requestId: request.id },
+        };
+      } catch (error) {
+        if (
+          error instanceof AppError &&
+          error.code === ErrorCode.UNAUTHORIZED
+        ) {
+          loginThrottle.recordFailure(throttleKey);
+        }
+        throw error;
+      }
+    },
+  );
 
-    const tokens = await opts.authService.refresh(refreshToken);
-    setAuthCookies(reply, tokens, app.env);
+  app.post(
+    "/auth/refresh",
+    {
+      config: {
+        rateLimit: authRateLimits.refresh,
+      },
+    },
+    async (request, reply) => {
+      const body = parseOrThrow(refreshBodySchema, request.body ?? {});
+      const cookieRefresh = readAuthCookies(request).refreshToken;
+      const refreshToken = body.refreshToken ?? cookieRefresh;
 
-    return {
-      data: toAuthSession(tokens),
-      meta: { requestId: request.id },
-    };
-  });
+      if (!refreshToken) {
+        throw badRequest("Refresh token missing", [
+          { field: "refreshToken", reason: "REQUIRED" },
+        ]);
+      }
 
-  app.post("/auth/logout", async (request, reply) => {
-    clearAuthCookies(reply, app.env);
+      const tokens = await opts.authService.refresh(refreshToken);
+      setAuthCookies(reply, tokens, app.env);
 
-    return reply.status(204).send();
-  });
+      return {
+        data: toAuthSession(tokens),
+        meta: { requestId: request.id },
+      };
+    },
+  );
+
+  app.post(
+    "/auth/logout",
+    {
+      config: {
+        rateLimit: authRateLimits.logout,
+      },
+    },
+    async (request, reply) => {
+      const refreshToken = readAuthCookies(request).refreshToken;
+      if (refreshToken) {
+        try {
+          await opts.authService.logout(refreshToken);
+        } catch (error) {
+          request.log.warn({ err: error }, "Keycloak logout revoke failed");
+        }
+      }
+
+      clearAuthCookies(reply, app.env);
+
+      return reply.status(204).send();
+    },
+  );
 
   app.get(
     "/auth/me",

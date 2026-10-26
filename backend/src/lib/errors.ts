@@ -7,6 +7,7 @@ export const ErrorCode = {
   FORBIDDEN: "FORBIDDEN",
   NOT_FOUND: "NOT_FOUND",
   CONFLICT: "CONFLICT",
+  RATE_LIMITED: "RATE_LIMITED",
   INTERNAL: "INTERNAL",
 } as const;
 
@@ -17,6 +18,10 @@ export type ErrorDetail = {
   readonly reason: string;
 };
 
+export type AppErrorOptions = {
+  readonly retryAfterSeconds?: number;
+};
+
 /**
  * Application error with HTTP status and stable code.
  */
@@ -24,18 +29,23 @@ export class AppError extends Error {
   readonly statusCode: number;
   readonly code: ErrorCode;
   readonly details: readonly ErrorDetail[];
+  readonly retryAfterSeconds?: number;
 
   constructor(
     code: ErrorCode,
     message: string,
     statusCode: number,
     details: readonly ErrorDetail[] = [],
+    options: AppErrorOptions = {},
   ) {
     super(message);
     this.name = "AppError";
     this.code = code;
     this.statusCode = statusCode;
     this.details = details;
+    if (options.retryAfterSeconds !== undefined) {
+      this.retryAfterSeconds = options.retryAfterSeconds;
+    }
   }
 }
 
@@ -70,3 +80,14 @@ export const notFound = (message = "Not found"): AppError =>
  */
 export const conflict = (message: string): AppError =>
   new AppError(ErrorCode.CONFLICT, message, 409);
+
+/**
+ * Creates a 429 Too Many Requests error.
+ */
+export const rateLimited = (
+  message = "Too many requests. Please try again later.",
+  retryAfterSeconds?: number,
+): AppError =>
+  new AppError(ErrorCode.RATE_LIMITED, message, 429, [], {
+    ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+  });

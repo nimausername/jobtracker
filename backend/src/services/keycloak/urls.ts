@@ -12,6 +12,7 @@ export const createKeycloakUrls = (env: Env) => {
     adminBase,
     issuer: realmBase,
     tokenUrl: `${realmBase}/protocol/openid-connect/token`,
+    logoutUrl: `${realmBase}/protocol/openid-connect/logout`,
     jwksUrl: `${realmBase}/protocol/openid-connect/certs`,
     usersUrl: `${adminBase}/users`,
   } as const;
