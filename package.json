@@ -1,0 +1,20 @@
+{
+  "name": "jobtracker",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:frontend": "pnpm --dir frontend dev",
+    "dev:backend": "pnpm --dir backend dev",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "build": "pnpm -r run build",
+    "test": "pnpm --dir backend test",
+    "db:generate": "pnpm --dir backend db:generate",
+    "db:migrate": "pnpm --dir backend db:migrate",
+    "db:studio": "pnpm --dir backend db:studio"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

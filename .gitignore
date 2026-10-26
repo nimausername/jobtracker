@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env and secrets
+.env
+.env.local
+.env.*.local
+frontend/.env.local
+!.env.example
+!**/.env.example
+
+# Builds
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Logs and caches
+*.log
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Drizzle
+drizzle/meta/_*

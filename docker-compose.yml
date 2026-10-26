@@ -1,0 +1,22 @@
+# Optional local Postgres for contributors who do not use a hosted database.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jobtracker-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: jobtracker
+      POSTGRES_PASSWORD: jobtracker
+      POSTGRES_DB: jobtracker
+    volumes:
+      - jobtracker_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobtracker -d jobtracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  jobtracker_pg_data:
