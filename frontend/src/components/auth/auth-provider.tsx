@@ -10,9 +10,13 @@ import {
   type ReactNode,
 } from "react";
 
-import { loginRequest, meRequest, registerRequest } from "@/lib/api/auth";
+import {
+  loginRequest,
+  logoutRequest,
+  meRequest,
+  registerRequest,
+} from "@/lib/api/auth";
 import type { AuthUser } from "@/lib/api/types";
-import { tokenStore } from "@/lib/auth/token-store";
 
 type AuthContextValue = {
   readonly user: AuthUser | null;
@@ -21,9 +25,13 @@ type AuthContextValue = {
   readonly register: (
     email: string,
     password: string,
-    name?: string,
+    options: {
+      readonly name?: string;
+      readonly acceptedLegal: true;
+      readonly documentsVersion: string;
+    },
   ) => Promise<void>;
-  readonly logout: () => void;
+  readonly logout: () => Promise<void>;
   readonly refreshUser: () => Promise<void>;
 };
 
@@ -34,19 +42,13 @@ type AuthProviderProps = {
 };
 
 /**
- * Provides session state for in-app auth.
+ * Provides session state for cookie-backed in-app auth.
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    const accessToken = tokenStore.getAccessToken();
-    if (!accessToken) {
-      setUser(null);
-      return;
-    }
-
     const profile = await meRequest();
     setUser(profile);
   }, []);
@@ -56,18 +58,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     const bootstrap = async () => {
       try {
-        if (!tokenStore.getAccessToken()) {
-          if (!cancelled) {
-            setUser(null);
-          }
-          return;
-        }
         const profile = await meRequest();
         if (!cancelled) {
           setUser(profile);
         }
       } catch {
-        tokenStore.clear();
         if (!cancelled) {
           setUser(null);
         }
@@ -86,28 +81,40 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const tokens = await loginRequest({ email, password });
-    tokenStore.setTokens(tokens.accessToken, tokens.refreshToken);
+    await loginRequest({ email, password });
     const profile = await meRequest();
     setUser(profile);
   }, []);
 
   const register = useCallback(
-    async (email: string, password: string, name?: string) => {
-      const tokens = await registerRequest({
+    async (
+      email: string,
+      password: string,
+      options: {
+        readonly name?: string;
+        readonly acceptedLegal: true;
+        readonly documentsVersion: string;
+      },
+    ) => {
+      await registerRequest({
         email,
         password,
-        ...(name ? { name } : {}),
+        acceptedLegal: options.acceptedLegal,
+        documentsVersion: options.documentsVersion,
+        ...(options.name ? { name: options.name } : {}),
       });
-      tokenStore.setTokens(tokens.accessToken, tokens.refreshToken);
       const profile = await meRequest();
       setUser(profile);
     },
     [],
   );
 
-  const logout = useCallback(() => {
-    tokenStore.clear();
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } catch {
+      // Local session clear still proceeds if the API is unreachable.
+    }
     setUser(null);
   }, []);
 

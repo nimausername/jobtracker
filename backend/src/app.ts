@@ -6,14 +6,21 @@ import type { Database } from "./db/client.js";
 import { AppError, ErrorCode } from "./lib/errors.js";
 import { resolveRequestId } from "./lib/request-id.js";
 import { authPlugin } from "./plugins/auth.js";
+import { AccountRepository } from "./repositories/account-repository.js";
 import { ApplicationsRepository } from "./repositories/applications-repository.js";
+import { LegalAcceptancesRepository } from "./repositories/legal-acceptances-repository.js";
 import { NotesRepository } from "./repositories/notes-repository.js";
+import { accountRoutes } from "./routes/account.js";
 import { applicationsRoutes } from "./routes/applications.js";
 import { authRoutes } from "./routes/auth.js";
 import { healthRoutes } from "./routes/health.js";
 import { notesRoutes } from "./routes/notes.js";
+import { AccountService } from "./services/account/account-service.js";
 import { AuthService } from "./services/auth/auth-service.js";
 import { ApplicationsService } from "./services/applications/applications-service.js";
+import { KeycloakAdminClient } from "./services/keycloak/admin-client.js";
+import { KeycloakTokenClient } from "./services/keycloak/token-client.js";
+import { createKeycloakUrls } from "./services/keycloak/urls.js";
 import { NotesService } from "./services/notes/notes-service.js";
 
 export type AppDeps = {
@@ -32,11 +39,21 @@ export const buildApp = async (deps: AppDeps) => {
     genReqId: (request) => resolveRequestId(request.headers["x-request-id"]),
   });
 
-  const authService = new AuthService(deps.env);
+  const authService = new AuthService(
+    deps.env,
+    new LegalAcceptancesRepository(deps.db),
+  );
   const applicationsService = new ApplicationsService(
     new ApplicationsRepository(deps.db),
   );
   const notesService = new NotesService(new NotesRepository(deps.db));
+
+  const keycloakUrls = createKeycloakUrls(deps.env);
+  const keycloakTokenClient = new KeycloakTokenClient(deps.env, keycloakUrls);
+  const accountService = new AccountService(
+    new AccountRepository(deps.db),
+    new KeycloakAdminClient(keycloakUrls, keycloakTokenClient),
+  );
 
   await app.register(cors, {
     origin: deps.env.CORS_ORIGIN,
@@ -79,6 +96,7 @@ export const buildApp = async (deps: AppDeps) => {
 
   await app.register(healthRoutes, { prefix: "/v1" });
   await app.register(authRoutes, { prefix: "/v1", authService });
+  await app.register(accountRoutes, { prefix: "/v1", accountService });
   await app.register(applicationsRoutes, {
     prefix: "/v1",
     applicationsService,
@@ -91,6 +109,7 @@ export const buildApp = async (deps: AppDeps) => {
   app.decorate("db", deps.db);
   app.decorate("env", deps.env);
   app.decorate("authService", authService);
+  app.decorate("accountService", accountService);
   app.decorate("applicationsService", applicationsService);
   app.decorate("notesService", notesService);
 
@@ -102,6 +121,7 @@ declare module "fastify" {
     db: Database;
     env: Env;
     authService: AuthService;
+    accountService: AccountService;
     applicationsService: ApplicationsService;
     notesService: NotesService;
   }

@@ -1,6 +1,4 @@
-import { tokenStore } from "@/lib/auth/token-store";
-
-import type { ApiErrorBody, ApiSuccess, AuthTokens } from "./types";
+import type { ApiErrorBody, ApiSuccess, AuthSession } from "./types";
 
 const getBaseUrl = (): string => {
   const base = process.env.NEXT_PUBLIC_API_URL;
@@ -41,35 +39,32 @@ type RequestOptions = {
 
 let refreshPromise: Promise<boolean> | null = null;
 
-const refreshAccessToken = async (): Promise<boolean> => {
-  const refreshToken = tokenStore.getRefreshToken();
-  if (!refreshToken) {
-    return false;
-  }
-
+const refreshSession = async (): Promise<boolean> => {
   try {
     const response = await fetch(`${getBaseUrl()}/v1/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({}),
     });
 
     if (!response.ok) {
-      tokenStore.clear();
       return false;
     }
 
-    const json = (await response.json()) as ApiSuccess<AuthTokens>;
-    tokenStore.setTokens(json.data.accessToken, json.data.refreshToken);
+    await response.json();
     return true;
   } catch {
-    tokenStore.clear();
     return false;
   }
 };
 
 /**
  * Typed JSON fetch against the Job Tracker API.
+ * Auth uses httpOnly cookies via `credentials: "include"`.
  */
 export const apiRequest = async <T>(
   path: string,
@@ -83,16 +78,10 @@ export const apiRequest = async <T>(
     headers["Content-Type"] = "application/json";
   }
 
-  if (options.auth !== false) {
-    const accessToken = tokenStore.getAccessToken();
-    if (accessToken) {
-      headers.Authorization = `Bearer ${accessToken}`;
-    }
-  }
-
   const response = await fetch(`${getBaseUrl()}${path}`, {
     method: options.method ?? (options.body ? "POST" : "GET"),
     headers,
+    credentials: "include",
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
 
@@ -101,7 +90,7 @@ export const apiRequest = async <T>(
     options.auth !== false &&
     !options.skipRefresh
   ) {
-    refreshPromise ??= refreshAccessToken().finally(() => {
+    refreshPromise ??= refreshSession().finally(() => {
       refreshPromise = null;
     });
     const refreshed = await refreshPromise;
@@ -128,3 +117,8 @@ export const apiRequest = async <T>(
 
   return (json as ApiSuccess<T>).data;
 };
+
+/**
+ * Establishes or refreshes a cookie-backed session (typed helper).
+ */
+export type { AuthSession };

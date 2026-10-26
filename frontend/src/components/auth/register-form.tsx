@@ -10,6 +10,7 @@ import { authControlClassName } from "@/components/auth/auth-field-styles";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PasswordField } from "@/components/auth/password-field";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
   FieldError,
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api/client";
+import { SITE_INFO } from "@/lib/legal/site-info";
 import { cn } from "@/lib/utils";
 
 /**
@@ -29,16 +31,27 @@ export const RegisterForm = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+
+    if (!acceptedLegal) {
+      setError("You must accept the Terms of Service and Privacy Policy.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await register(email.trim(), password, name.trim() || undefined);
+      await register(email.trim(), password, {
+        acceptedLegal: true,
+        documentsVersion: SITE_INFO.documentsVersion,
+        ...(name.trim() ? { name: name.trim() } : {}),
+      });
       router.replace("/dashboard");
     } catch (err) {
       if (err instanceof ApiError) {
@@ -110,6 +123,42 @@ export const RegisterForm = () => {
             description="At least 8 characters."
             disabled={isSubmitting}
           />
+
+          <Field orientation="horizontal" className="items-start">
+            <Checkbox
+              id="register-legal"
+              checked={acceptedLegal}
+              onCheckedChange={(checked) => setAcceptedLegal(checked)}
+              required
+              aria-required="true"
+              disabled={isSubmitting}
+              aria-label="Accept Terms of Service and Privacy Policy"
+            />
+            <FieldLabel
+              htmlFor="register-legal"
+              className="text-sm font-normal leading-snug text-muted-foreground"
+            >
+              I agree to the{" "}
+              <Link
+                href="/terms"
+                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </FieldLabel>
+          </Field>
         </FieldGroup>
 
         {error ? <FieldError>{error}</FieldError> : null}
@@ -117,7 +166,7 @@ export const RegisterForm = () => {
         <Button
           type="submit"
           className="h-10 w-full"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !acceptedLegal}
           aria-busy={isSubmitting}
         >
           {isSubmitting ? (

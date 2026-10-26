@@ -97,6 +97,32 @@ export class KeycloakAdminClient {
     }
   }
 
+  /**
+   * Permanently deletes a Keycloak user by id.
+   */
+  async deleteUser(userId: string): Promise<void> {
+    const accessToken = await this.tokenClient.getClientCredentialsToken();
+    const response = await fetch(`${this.urls.usersUrl}/${userId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (response.status === 404) {
+      return;
+    }
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new AppError(
+        "INTERNAL",
+        `Failed to delete Keycloak user: ${detail || response.statusText}`,
+        502,
+      );
+    }
+  }
+
   private async findUserIdByEmail(
     accessToken: string,
     email: string,

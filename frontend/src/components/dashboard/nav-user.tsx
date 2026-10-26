@@ -1,6 +1,10 @@
 "use client";
 
-import { ChevronsUpDownIcon, LogOutIcon } from "lucide-react";
+import {
+  ChevronsUpDownIcon,
+  LogOutIcon,
+  UserRoundIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
@@ -46,8 +50,8 @@ export const NavUser = () => {
   const displayEmail = user?.email ?? user?.id ?? "";
   const initials = getInitials(user?.name, user?.email);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.replace("/login");
   };
 
@@ -104,8 +108,14 @@ export const NavUser = () => {
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem
+                onClick={() => router.push("/dashboard/account")}
+              >
+                <UserRoundIcon aria-hidden="true" />
+                Account settings
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 variant="destructive"
-                onClick={handleLogout}
+                onClick={() => void handleLogout()}
               >
                 <LogOutIcon aria-hidden="true" />
                 Log out

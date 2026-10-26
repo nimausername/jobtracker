@@ -14,6 +14,7 @@ export type BreadcrumbCrumb = {
 const ROUTE_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   applications: "Applications",
+  account: "Account",
 };
 
 const isLikelyId = (segment: string): boolean =>

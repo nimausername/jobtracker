@@ -1,6 +1,10 @@
 "use client";
 
-import { BriefcaseBusinessIcon, LayoutDashboardIcon } from "lucide-react";
+import {
+  BriefcaseBusinessIcon,
+  LayoutDashboardIcon,
+  UserRoundIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -30,6 +34,11 @@ const navItems = [
     title: "Applications",
     href: "/dashboard/applications",
     icon: BriefcaseBusinessIcon,
+  },
+  {
+    title: "Account",
+    href: "/dashboard/account",
+    icon: UserRoundIcon,
   },
 ] as const;
 

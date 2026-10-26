@@ -1,11 +1,17 @@
 import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 
 import {
+  clearAuthCookies,
+  readAuthCookies,
+  setAuthCookies,
+} from "../lib/auth-cookies.js";
+import { badRequest } from "../lib/errors.js";
+import { parseOrThrow } from "../lib/validate.js";
+import {
   loginBodySchema,
-  refreshBodySchema,
   registerBodySchema,
 } from "../schemas/auth.js";
-import { parseOrThrow } from "../lib/validate.js";
 import type { AuthService } from "../services/auth/auth-service.js";
 import type { TokenResponse } from "../services/keycloak/token-client.js";
 
@@ -13,16 +19,20 @@ type AuthRouteOptions = {
   readonly authService: AuthService;
 };
 
-const toAuthData = (tokens: TokenResponse) => ({
-  accessToken: tokens.accessToken,
-  refreshToken: tokens.refreshToken,
+const refreshBodySchema = z.object({
+  refreshToken: z.string().min(1).optional(),
+});
+
+const toAuthSession = (tokens: TokenResponse) => ({
+  authenticated: true as const,
   expiresIn: tokens.expiresIn,
   refreshExpiresIn: tokens.refreshExpiresIn,
   tokenType: tokens.tokenType,
 });
 
 /**
- * Auth routes: register, login, refresh, and current user.
+ * Auth routes: register, login, refresh, logout, and current user.
+ * Tokens are stored in httpOnly cookies; JSON only returns session metadata.
  */
 export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
   app,
@@ -30,36 +40,68 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
 ) => {
   app.post("/auth/register", async (request, reply) => {
     const body = parseOrThrow(registerBodySchema, request.body);
+    const forwardedFor = request.headers["x-forwarded-for"];
+    const ipAddress =
+      typeof forwardedFor === "string"
+        ? forwardedFor.split(",")[0]?.trim()
+        : request.ip;
+    const userAgentHeader = request.headers["user-agent"];
+    const userAgent =
+      typeof userAgentHeader === "string" ? userAgentHeader : undefined;
+
     const tokens = await opts.authService.register({
       email: body.email,
       password: body.password,
+      acceptedLegal: body.acceptedLegal,
+      documentsVersion: body.documentsVersion,
       ...(body.name ? { name: body.name } : {}),
+      ...(ipAddress ? { ipAddress } : {}),
+      ...(userAgent ? { userAgent } : {}),
     });
+
+    setAuthCookies(reply, tokens, app.env);
 
     return reply.status(201).send({
-      data: toAuthData(tokens),
+      data: toAuthSession(tokens),
       meta: { requestId: request.id },
     });
   });
 
-  app.post("/auth/login", async (request) => {
+  app.post("/auth/login", async (request, reply) => {
     const body = parseOrThrow(loginBodySchema, request.body);
     const tokens = await opts.authService.login(body);
+    setAuthCookies(reply, tokens, app.env);
 
     return {
-      data: toAuthData(tokens),
+      data: toAuthSession(tokens),
       meta: { requestId: request.id },
     };
   });
 
-  app.post("/auth/refresh", async (request) => {
-    const body = parseOrThrow(refreshBodySchema, request.body);
-    const tokens = await opts.authService.refresh(body.refreshToken);
+  app.post("/auth/refresh", async (request, reply) => {
+    const body = parseOrThrow(refreshBodySchema, request.body ?? {});
+    const cookieRefresh = readAuthCookies(request).refreshToken;
+    const refreshToken = body.refreshToken ?? cookieRefresh;
+
+    if (!refreshToken) {
+      throw badRequest("Refresh token missing", [
+        { field: "refreshToken", reason: "REQUIRED" },
+      ]);
+    }
+
+    const tokens = await opts.authService.refresh(refreshToken);
+    setAuthCookies(reply, tokens, app.env);
 
     return {
-      data: toAuthData(tokens),
+      data: toAuthSession(tokens),
       meta: { requestId: request.id },
     };
+  });
+
+  app.post("/auth/logout", async (request, reply) => {
+    clearAuthCookies(reply, app.env);
+
+    return reply.status(204).send();
   });
 
   app.get(

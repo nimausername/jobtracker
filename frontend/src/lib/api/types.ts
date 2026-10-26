@@ -26,11 +26,10 @@ export type ApiErrorBody = {
 };
 
 /**
- * Tokens returned by auth endpoints.
+ * Session metadata returned by auth endpoints (tokens live in httpOnly cookies).
  */
-export type AuthTokens = {
-  readonly accessToken: string;
-  readonly refreshToken: string;
+export type AuthSession = {
+  readonly authenticated: true;
   readonly expiresIn: number;
   readonly refreshExpiresIn: number;
   readonly tokenType: string;
@@ -43,4 +42,19 @@ export type AuthUser = {
   readonly id: string;
   readonly email: string | null;
   readonly name: string | null;
+};
+
+/**
+ * Portable account export payload.
+ */
+export type AccountExport = {
+  readonly exportedAt: string;
+  readonly user: {
+    readonly id: string;
+    readonly email: string | null;
+    readonly name: string | null;
+  };
+  readonly applications: ReadonlyArray<Record<string, unknown>>;
+  readonly applicationNotes: ReadonlyArray<Record<string, unknown>>;
+  readonly legalAcceptances: ReadonlyArray<Record<string, unknown>>;
 };

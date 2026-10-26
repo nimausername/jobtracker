@@ -2,6 +2,7 @@ import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 
+import { readAuthCookies } from "../lib/auth-cookies.js";
 import { unauthorized } from "../lib/errors.js";
 import type { AuthService } from "../services/auth/auth-service.js";
 
@@ -35,13 +36,13 @@ const authPluginImpl: FastifyPluginAsync<AuthPluginOptions> = async (
    */
   const authenticate = async (request: FastifyRequest): Promise<void> => {
     const header = request.headers.authorization;
-    if (!header?.startsWith("Bearer ")) {
-      throw unauthorized("Missing bearer token");
-    }
+    const bearer =
+      header?.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
+    const cookieToken = readAuthCookies(request).accessToken;
+    const token = bearer || cookieToken;
 
-    const token = header.slice("Bearer ".length).trim();
     if (!token) {
-      throw unauthorized("Missing bearer token");
+      throw unauthorized("Missing access token");
     }
 
     let payload: JWTPayload;

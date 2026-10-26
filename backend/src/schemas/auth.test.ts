@@ -3,20 +3,36 @@ import { describe, expect, it } from "vitest";
 import { loginBodySchema, registerBodySchema } from "./auth.js";
 
 describe("auth schemas", () => {
-  it("accepts a valid registration payload", () => {
+  it("accepts a valid registration payload with legal acceptance", () => {
     const parsed = registerBodySchema.parse({
       email: "nima@example.com",
       password: "password123",
       name: "Nima",
+      acceptedLegal: true,
+      documentsVersion: "2026-10-26.2",
     });
 
     expect(parsed.email).toBe("nima@example.com");
+    expect(parsed.acceptedLegal).toBe(true);
+  });
+
+  it("rejects registration without legal acceptance", () => {
+    const result = registerBodySchema.safeParse({
+      email: "nima@example.com",
+      password: "password123",
+      acceptedLegal: false,
+      documentsVersion: "2026-10-26.2",
+    });
+
+    expect(result.success).toBe(false);
   });
 
   it("rejects short passwords", () => {
     const result = registerBodySchema.safeParse({
       email: "nima@example.com",
       password: "short",
+      acceptedLegal: true,
+      documentsVersion: "2026-10-26.2",
     });
 
     expect(result.success).toBe(false);
@@ -27,7 +43,6 @@ describe("auth schemas", () => {
       email: "nima@example.com",
       password: "password123",
     });
-
     expect(parsed.email).toBe("nima@example.com");
   });
 });

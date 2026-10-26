@@ -3,3 +3,4 @@ export {
   applications,
   applicationStatusEnum,
 } from "./applications.js";
+export { legalAcceptances } from "./legal-acceptances.js";
