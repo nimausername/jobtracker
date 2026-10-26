@@ -1,63 +1,70 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
-import { buttonVariants } from "@/components/ui/button";
+import { ApplicationFormDialog } from "@/components/applications/application-form-dialog";
+import { OverviewKpiRow } from "@/components/dashboard/overview-kpi-row";
+import { RecentApplicationsFrame } from "@/components/dashboard/recent-applications-frame";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
+  createApplication,
   getApplicationsSummary,
+  listApplications,
+  type Application,
+  type ApplicationInput,
   type ApplicationSummary,
 } from "@/lib/api/applications";
-import { statusLabel } from "@/lib/applications/status";
 import { cn } from "@/lib/utils";
 
 /**
- * Dashboard overview with pipeline counts.
+ * Dashboard overview — Frame-led KPI grid + recent applications.
  */
 const DashboardPage = () => {
   const [summary, setSummary] = useState<ApplicationSummary | null>(null);
+  const [recent, setRecent] = useState<Application[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
 
-    const load = async () => {
-      try {
-        const data = await getApplicationsSummary();
-        if (!cancelled) {
-          setSummary(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load");
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const [summaryData, recentData] = await Promise.all([
+        getApplicationsSummary(),
+        listApplications({ limit: 5 }),
+      ]);
+      setSummary(summaryData);
+      setRecent(recentData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load overview");
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleAddApplication = () => {
+    setDialogOpen(true);
+  };
+
+  const handleCreate = async (input: ApplicationInput) => {
+    await createApplication(input);
+    toast.success("Application created");
+    setDialogOpen(false);
+    await load();
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+    <div className="flex min-w-0 flex-col gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h1 className="font-heading text-2xl font-semibold tracking-tight">
             Overview
           </h1>
@@ -65,59 +72,52 @@ const DashboardPage = () => {
             Your job search pipeline at a glance.
           </p>
         </div>
-        <Link
-          href="/dashboard/applications"
-          className={cn(buttonVariants())}
-          aria-label="Go to applications"
-        >
-          Open applications
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" type="button" onClick={handleAddApplication}>
+            Add application
+          </Button>
+          <Link
+            href="/dashboard/applications"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            View all
+          </Link>
+        </div>
       </div>
 
       {error ? (
-        <p className="text-sm text-destructive" role="alert">
-          {error}
-        </p>
+        <div
+          className="flex flex-col gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <p className="text-sm text-destructive">{error}</p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              void load();
+            }}
+          >
+            Retry
+          </Button>
+        </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total</CardDescription>
-            <CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
-              {isLoading ? <Skeleton className="h-8 w-12" /> : (summary?.total ?? 0)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Tracked applications</p>
-          </CardContent>
-        </Card>
+      <OverviewKpiRow summary={summary} isLoading={isLoading} />
 
-        {(
-          [
-            "wishlist",
-            "applied",
-            "interview",
-            "offer",
-          ] as const
-        ).map((status) => (
-          <Card key={status}>
-            <CardHeader className="pb-2">
-              <CardDescription>{statusLabel[status]}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
-                {isLoading ? (
-                  <Skeleton className="h-8 w-12" />
-                ) : (
-                  (summary?.byStatus[status] ?? 0)
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">In this stage</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <RecentApplicationsFrame
+        applications={recent}
+        isLoading={isLoading}
+        isEmpty={!isLoading && (summary?.total ?? 0) === 0}
+        onAddApplication={handleAddApplication}
+      />
+
+      <ApplicationFormDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSubmit={handleCreate}
+      />
     </div>
   );
 };

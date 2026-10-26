@@ -1,15 +1,10 @@
 "use client";
 
-import {
-  BriefcaseBusinessIcon,
-  LayoutDashboardIcon,
-  LogOutIcon,
-} from "lucide-react";
+import { BriefcaseBusinessIcon, LayoutDashboardIcon } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
-import { useAuth } from "@/components/auth/auth-provider";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { NavUser } from "@/components/dashboard/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -43,23 +38,6 @@ const navItems = [
  */
 export const AppSidebar = () => {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, logout } = useAuth();
-
-  const initials =
-    user?.name
-      ?.split(/\s+/)
-      .map((part) => part[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() ||
-    user?.email?.slice(0, 2).toUpperCase() ||
-    "JT";
-
-  const handleLogout = () => {
-    logout();
-    router.replace("/login");
-  };
 
   return (
     <Sidebar collapsible="icon">
@@ -115,34 +93,8 @@ export const AppSidebar = () => {
       </SidebarContent>
 
       <SidebarFooter>
-        <SidebarSeparator />
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="pointer-events-none">
-              <Avatar className="size-8 rounded-lg">
-                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-              </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">
-                  {user?.name ?? "Account"}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {user?.email ?? user?.id}
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Sign out"
-              onClick={handleLogout}
-              aria-label="Sign out"
-            >
-              <LogOutIcon />
-              <span>Sign out</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <SidebarSeparator className="mx-0" />
+        <NavUser />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
