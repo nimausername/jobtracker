@@ -1,13 +1,28 @@
+import Link from "next/link";
+
 import { LoginForm } from "@/components/auth/login-form";
+import { GradientAsciiBackground } from "@/components/reactbits/gradient-ascii-background";
 
 /**
- * Login page shell.
+ * Login page shell — full-viewport auth card on GradientASCII.
  */
 const LoginPage = () => {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-100 via-background to-emerald-50 px-6 py-16">
-      <LoginForm />
-    </main>
+    <GradientAsciiBackground
+      className="min-h-dvh"
+      contentClassName="min-h-dvh items-center justify-center px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6"
+    >
+      <div className="flex w-full min-w-0 max-w-sm flex-col gap-6">
+        <Link
+          href="/"
+          className="self-center text-sm font-medium text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline"
+          aria-label="Back to home"
+        >
+          Job Tracker
+        </Link>
+        <LoginForm />
+      </div>
+    </GradientAsciiBackground>
   );
 };
 

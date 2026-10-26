@@ -3,22 +3,25 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { LoaderCircleIcon } from "lucide-react";
 
+import { AuthCard } from "@/components/auth/auth-card";
+import { authControlClassName } from "@/components/auth/auth-field-styles";
 import { useAuth } from "@/components/auth/auth-provider";
+import { PasswordField } from "@/components/auth/password-field";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api/client";
+import { cn } from "@/lib/utils";
 
 /**
- * In-app login form that calls the Job Tracker API.
+ * Sign-in form adapted from ReUI c-card-12, wired to the Job Tracker API.
  */
 export const LoginForm = () => {
   const router = useRouter();
@@ -48,58 +51,68 @@ export const LoginForm = () => {
   };
 
   return (
-    <Card className="w-full max-w-md border-border/60 shadow-sm">
-      <CardHeader>
-        <CardTitle className="font-heading text-2xl">Sign in</CardTitle>
-        <CardDescription>
-          Stay in Job Tracker — Keycloak runs in the background.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+    <AuthCard
+      title="Sign in"
+      description="Enter your email and password to access your account."
+      footer={
+        <>
+          No account yet?{" "}
+          <Link
+            className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+            href="/register"
+          >
+            Create one
+          </Link>
+        </>
+      }
+    >
+      <form className="grid gap-6" onSubmit={handleSubmit} noValidate>
+        <FieldGroup>
+          <Field data-invalid={error ? true : undefined}>
+            <FieldLabel htmlFor="login-email">Email address</FieldLabel>
             <Input
-              id="email"
+              id="login-email"
               name="email"
               type="email"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder="name@example.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               required
               aria-required="true"
+              disabled={isSubmitting}
+              className={cn(authControlClassName)}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              aria-required="true"
-            />
-          </div>
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <Button className="w-full" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Signing in…" : "Sign in"}
-          </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            No account yet?{" "}
-            <Link className="underline underline-offset-4" href="/register">
-              Create one
-            </Link>
-          </p>
-        </form>
-      </CardContent>
-    </Card>
+          </Field>
+
+          <PasswordField
+            id="login-password"
+            label="Password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+            disabled={isSubmitting}
+          />
+        </FieldGroup>
+
+        {error ? <FieldError>{error}</FieldError> : null}
+
+        <Button
+          type="submit"
+          className="h-10 w-full"
+          disabled={isSubmitting}
+          aria-busy={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <LoaderCircleIcon className="animate-spin" aria-hidden="true" />
+              Signing in…
+            </>
+          ) : (
+            "Sign in"
+          )}
+        </Button>
+      </form>
+    </AuthCard>
   );
 };

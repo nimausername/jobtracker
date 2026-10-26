@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { CodeXmlIcon } from "lucide-react";
 
+import { GradientAsciiBackground } from "@/components/reactbits/gradient-ascii-background";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -8,47 +11,56 @@ import { cn } from "@/lib/utils";
  */
 const HomePage = () => {
   return (
-    <main className="relative flex min-h-screen flex-col overflow-hidden bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-100 via-background to-emerald-50">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(15,23,42,0.04)_1px,transparent_1px)] bg-size-[48px_48px]" />
+    <GradientAsciiBackground
+      className="min-h-dvh"
+      contentClassName="min-h-dvh items-center justify-center px-4 pt-[max(3.5rem,env(safe-area-inset-top))] pb-[max(3.5rem,env(safe-area-inset-bottom))] sm:px-6"
+    >
+      <section className="flex w-full max-w-3xl flex-col items-center text-center">
+        <Badge
+          variant="outline"
+          className="h-7 gap-1.5 border-white/20 bg-white/10 px-3 text-white backdrop-blur-sm"
+        >
+          <CodeXmlIcon aria-hidden="true" />
+          Open source & self-hosted
+        </Badge>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-6 py-16">
-        <p className="font-heading text-sm font-medium tracking-[0.2em] text-muted-foreground uppercase">
-          Job Tracker
-        </p>
-        <h1 className="font-heading mt-4 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-          Keep every application in one place
+        <h1 className="font-heading mt-5 max-w-[18ch] text-[clamp(2rem,6.5vw,3.75rem)] font-semibold leading-[1.08] tracking-tight text-balance text-white sm:mt-6 sm:max-w-[20ch]">
+          Keep every{" "}
+          <span className="font-display text-[1.15em] font-normal leading-none">
+            application
+          </span>{" "}
+          in one place
         </h1>
-        <p className="mt-4 max-w-xl text-lg text-muted-foreground">
+
+        <p className="mt-4 max-w-md text-pretty text-base leading-relaxed text-white/75 sm:mt-5 sm:max-w-xl sm:text-lg">
           Track status, notes, and follow-ups for jobs anywhere in the world —
           starting with a clean, open-source pipeline.
         </p>
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-8 flex w-full max-w-sm flex-col gap-3 sm:mt-9 sm:max-w-none sm:flex-row sm:justify-center">
           <Link
             href="/login"
-            className={cn(buttonVariants({ size: "lg" }))}
+            className={cn(
+              buttonVariants({ size: "lg" }),
+              "h-11 w-full bg-white text-black hover:bg-white/90 sm:w-auto sm:min-w-36",
+            )}
             aria-label="Sign in to Job Tracker"
           >
             Sign in
           </Link>
           <Link
             href="/register"
-            className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "lg" }),
+              "h-11 w-full border-white/30 bg-white/5 text-white hover:bg-white/10 hover:text-white sm:w-auto sm:min-w-36",
+            )}
             aria-label="Create a Job Tracker account"
           >
             Create account
           </Link>
         </div>
-
-        <p className="mt-10 text-sm text-muted-foreground">
-          API health: configure{" "}
-          <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-            NEXT_PUBLIC_API_URL
-          </code>{" "}
-          then run the backend on port 4000.
-        </p>
-      </div>
-    </main>
+      </section>
+    </GradientAsciiBackground>
   );
 };
 
