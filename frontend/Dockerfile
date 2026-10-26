@@ -8,20 +8,24 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY backend/package.json ./backend/
 COPY frontend/package.json ./frontend/
-RUN pnpm install --frozen-lockfile --filter @jobtracker/frontend...
+# Inline NODE_ENV: Coolify passes --build-arg NODE_ENV=production, which would
+# skip devDependencies (typescript) and break the next stage.
+RUN NODE_ENV=development pnpm install --frozen-lockfile --filter @jobtracker/frontend...
 
 FROM base AS build
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/ ./
 COPY frontend ./frontend
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-RUN pnpm --filter @jobtracker/frontend build
+RUN NODE_ENV=development pnpm --filter @jobtracker/frontend build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup -S nodejs && adduser -S nodejs -G nodejs
 
