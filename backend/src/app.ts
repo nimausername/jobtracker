@@ -70,6 +70,8 @@ export const buildApp = async (deps: AppDeps) => {
   await app.register(cors, {
     origin: deps.env.CORS_ORIGIN,
     credentials: true,
+    // @fastify/cors defaults to GET,HEAD,POST only — PATCH/DELETE need an explicit allow-list.
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
   await app.register(securityPlugin);

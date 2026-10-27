@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { ApplicationFormDialog } from "@/components/applications/application-form-dialog";
+import { ConfirmDeleteDialog } from "@/components/applications/confirm-delete-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -58,6 +59,9 @@ export const ApplicationDetail = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteApplicationOpen, setDeleteApplicationOpen] = useState(false);
+  const [pendingNoteDelete, setPendingNoteDelete] =
+    useState<ApplicationNote | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -87,23 +91,14 @@ export const ApplicationDetail = ({
     toast.success("Application updated");
   };
 
-  const handleDeleteApplication = async () => {
-    if (!application) {
-      return;
-    }
-    const confirmed = window.confirm(
-      `Delete ${application.jobTitle} at ${application.companyName}?`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
+  const handleConfirmDeleteApplication = async () => {
     try {
       await deleteApplication(applicationId);
       toast.success("Application deleted");
       router.replace("/dashboard/applications");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
+      throw err;
     }
   };
 
@@ -127,18 +122,20 @@ export const ApplicationDetail = ({
     }
   };
 
-  const handleDeleteNote = async (note: ApplicationNote) => {
-    const confirmed = window.confirm("Delete this timeline note?");
-    if (!confirmed) {
+  const handleConfirmDeleteNote = async () => {
+    if (!pendingNoteDelete) {
       return;
     }
 
     try {
-      await deleteNote(applicationId, note.id);
-      setNotes((prev) => prev.filter((item) => item.id !== note.id));
+      await deleteNote(applicationId, pendingNoteDelete.id);
+      setNotes((prev) =>
+        prev.filter((item) => item.id !== pendingNoteDelete.id),
+      );
       toast.success("Note deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not delete note");
+      throw err;
     }
   };
 
@@ -203,7 +200,10 @@ export const ApplicationDetail = ({
           <Button variant="outline" onClick={() => setEditOpen(true)}>
             Edit
           </Button>
-          <Button variant="destructive" onClick={() => void handleDeleteApplication()}>
+          <Button
+            variant="destructive"
+            onClick={() => setDeleteApplicationOpen(true)}
+          >
             Delete
           </Button>
         </div>
@@ -285,7 +285,7 @@ export const ApplicationDetail = ({
                         size="icon-sm"
                         variant="ghost"
                         aria-label="Delete note"
-                        onClick={() => void handleDeleteNote(note)}
+                        onClick={() => setPendingNoteDelete(note)}
                       >
                         <Trash2Icon />
                       </Button>
@@ -304,6 +304,26 @@ export const ApplicationDetail = ({
         onOpenChange={setEditOpen}
         initial={application}
         onSubmit={handleUpdate}
+      />
+
+      <ConfirmDeleteDialog
+        open={deleteApplicationOpen}
+        onOpenChange={setDeleteApplicationOpen}
+        title="Delete application?"
+        description={`This permanently removes ${application.jobTitle} at ${application.companyName} and its timeline notes.`}
+        onConfirm={handleConfirmDeleteApplication}
+      />
+
+      <ConfirmDeleteDialog
+        open={pendingNoteDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingNoteDelete(null);
+          }
+        }}
+        title="Delete note?"
+        description="This permanently removes the timeline note from this application."
+        onConfirm={handleConfirmDeleteNote}
       />
     </div>
   );

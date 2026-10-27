@@ -2,8 +2,12 @@
 
 import {
   BriefcaseBusinessIcon,
+  EyeIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
   PlusIcon,
   SearchIcon,
+  Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -11,9 +15,18 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ApplicationFormDialog } from "@/components/applications/application-form-dialog";
+import { ConfirmDeleteDialog } from "@/components/applications/confirm-delete-dialog";
 import { Badge } from "@/components/reui/badge";
 import { Frame, FramePanel } from "@/components/reui/frame";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Empty,
   EmptyContent,
@@ -53,7 +66,6 @@ import {
   pipelineBadgeVariant,
   statusLabel,
 } from "@/lib/applications/status";
-import { cn } from "@/lib/utils";
 
 const parseStatusParam = (
   value: string | null,
@@ -91,6 +103,7 @@ export const ApplicationsWorkspace = () => {
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Application | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Application | null>(null);
 
   useEffect(() => {
     setStatus(parseStatusParam(searchParams.get("status")));
@@ -156,20 +169,18 @@ export const ApplicationsWorkspace = () => {
     await load();
   };
 
-  const handleDelete = async (application: Application) => {
-    const confirmed = window.confirm(
-      `Delete ${application.jobTitle} at ${application.companyName}?`,
-    );
-    if (!confirmed) {
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) {
       return;
     }
 
     try {
-      await deleteApplication(application.id);
+      await deleteApplication(pendingDelete.id);
       toast.success("Application deleted");
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
+      throw err instanceof Error ? err : new Error("Delete failed");
     }
   };
 
@@ -312,7 +323,9 @@ export const ApplicationsWorkspace = () => {
                     <TableHead>Role</TableHead>
                     <TableHead>Location</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="w-12">
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -341,35 +354,49 @@ export const ApplicationsWorkspace = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Link
-                            href={`/dashboard/applications/${item.id}`}
-                            className={cn(
-                              buttonVariants({
-                                size: "sm",
-                                variant: "ghost",
-                              }),
-                            )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="-me-1.5"
+                                aria-label={`Actions for ${item.jobTitle} at ${item.companyName}`}
+                              />
+                            }
                           >
-                            Open
-                          </Link>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            type="button"
-                            onClick={() => handleEdit(item)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            type="button"
-                            onClick={() => void handleDelete(item)}
-                          >
-                            Delete
-                          </Button>
-                        </div>
+                            <MoreHorizontalIcon aria-hidden="true" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-36">
+                            <DropdownMenuGroup>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  router.push(
+                                    `/dashboard/applications/${item.id}`,
+                                  )
+                                }
+                              >
+                                <EyeIcon aria-hidden="true" />
+                                Open
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleEdit(item)}
+                              >
+                                <PencilIcon aria-hidden="true" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => setPendingDelete(item)}
+                              >
+                                <Trash2Icon aria-hidden="true" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuGroup>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -385,6 +412,22 @@ export const ApplicationsWorkspace = () => {
         onOpenChange={setDialogOpen}
         initial={editing}
         onSubmit={handleSubmit}
+      />
+
+      <ConfirmDeleteDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingDelete(null);
+          }
+        }}
+        title="Delete application?"
+        description={
+          pendingDelete
+            ? `This permanently removes ${pendingDelete.jobTitle} at ${pendingDelete.companyName} and its timeline notes.`
+            : "This permanently removes the application and its timeline notes."
+        }
+        onConfirm={handleConfirmDelete}
       />
     </div>
   );
