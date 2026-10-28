@@ -99,7 +99,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           isRefreshingRef.current = true;
           try {
             const session = await refreshRequest();
-            // Auth rejection clears via onExpired; retry later on transient failure.
+            // Failure here is not logout: access may still be valid.
+            // Retry later; apiRequest clears auth only after 401 + failed refresh.
             if (!session && userRef.current) {
               scheduleRefreshRef.current(DEFAULT_ACCESS_TTL_SECONDS);
             }
@@ -148,16 +149,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           return;
         }
         setUser(profile);
-
-        const session = await refreshRequest();
-        if (cancelled) {
-          return;
-        }
-        if (session) {
-          scheduleRefresh(session.expiresIn);
-        } else {
-          scheduleRefresh(DEFAULT_ACCESS_TTL_SECONDS);
-        }
+        // Do not refresh immediately on load — that raced Keycloak rotation
+        // and logged users out after hard refresh. Schedule a later refresh.
+        scheduleRefresh(DEFAULT_ACCESS_TTL_SECONDS);
       } catch {
         if (!cancelled) {
           setUser(null);
@@ -185,6 +179,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return;
       }
 
+      // Soft refresh only: never treat failure as logout while access may work.
       isRefreshingRef.current = true;
       void (async () => {
         try {

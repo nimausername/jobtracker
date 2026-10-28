@@ -57,6 +57,7 @@ export const setAuthSessionHandlers = (
 /**
  * Refreshes the cookie-backed session via the API.
  * Single-flights concurrent callers onto one network request.
+ * Does not clear auth state on failure — callers decide.
  */
 export const refreshSession = async (): Promise<AuthSession | null> => {
   if (refreshPromise) {
@@ -76,10 +77,6 @@ export const refreshSession = async (): Promise<AuthSession | null> => {
       });
 
       if (!response.ok) {
-        // Only treat auth rejections as permanent expiry; keep UI session on blips.
-        if (response.status === 400 || response.status === 401) {
-          authSessionHandlers.onExpired?.();
-        }
         return null;
       }
 
@@ -129,6 +126,8 @@ export const apiRequest = async <T>(
     if (refreshed) {
       return apiRequest<T>(path, { ...options, skipRefresh: true });
     }
+    // Access rejected and refresh failed — session is gone.
+    authSessionHandlers.onExpired?.();
   }
 
   if (response.status === 204) {
