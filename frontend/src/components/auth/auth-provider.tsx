@@ -219,18 +219,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         readonly documentsVersion: string;
       },
     ) => {
-      const session = await registerRequest({
+      await registerRequest({
         email,
         password,
         acceptedLegal: options.acceptedLegal,
         documentsVersion: options.documentsVersion,
         ...(options.name ? { name: options.name } : {}),
       });
-      const profile = await meRequest();
-      setUser(profile);
-      scheduleRefresh(session.expiresIn);
     },
-    [scheduleRefresh],
+    [],
   );
 
   const logout = useCallback(async () => {

@@ -1,5 +1,5 @@
 import { apiRequest, refreshSession } from "./client";
-import type { AuthSession, AuthUser } from "./types";
+import type { AuthSession, AuthUser, RegisterResult } from "./types";
 
 export type RegisterInput = {
   readonly email: string;
@@ -15,10 +15,10 @@ export type LoginInput = {
 };
 
 /**
- * Registers a new account via the API (sets httpOnly cookies).
+ * Registers a new account via the API. Does not create a session.
  */
-export const registerRequest = (input: RegisterInput): Promise<AuthSession> =>
-  apiRequest<AuthSession>("/v1/auth/register", {
+export const registerRequest = (input: RegisterInput): Promise<RegisterResult> =>
+  apiRequest<RegisterResult>("/v1/auth/register", {
     method: "POST",
     body: input,
     auth: false,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { LoaderCircleIcon } from "lucide-react";
+import { toast } from "sonner";
 
 import { AuthCard } from "@/components/auth/auth-card";
 import { authControlClassName } from "@/components/auth/auth-field-styles";
@@ -52,7 +53,8 @@ export const RegisterForm = () => {
         documentsVersion: SITE_INFO.documentsVersion,
         ...(name.trim() ? { name: name.trim() } : {}),
       });
-      router.replace("/dashboard");
+      toast.success("Account created. Please sign in.");
+      router.replace("/login?registered=1");
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -96,7 +98,7 @@ export const RegisterForm = () => {
             />
           </Field>
 
-          <Field data-invalid={error ? true : undefined}>
+          <Field data-invalid={Boolean(error) || undefined}>
             <FieldLabel htmlFor="register-email">Email address</FieldLabel>
             <Input
               id="register-email"

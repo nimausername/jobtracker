@@ -36,6 +36,13 @@ export type AuthSession = {
 };
 
 /**
+ * Successful registration response (no session cookies are set).
+ */
+export type RegisterResult = {
+  readonly created: true;
+};
+
+/**
  * Current authenticated user profile.
  */
 export type AuthUser = {

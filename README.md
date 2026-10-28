@@ -114,7 +114,7 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/v1/auth/register` | Create Keycloak user + return tokens |
+| `POST` | `/v1/auth/register` | Create Keycloak user (then sign in via login) |
 | `POST` | `/v1/auth/login` | Email/password login |
 | `POST` | `/v1/auth/refresh` | Refresh tokens |
 | `GET` | `/v1/auth/me` | Current user (Bearer token) |

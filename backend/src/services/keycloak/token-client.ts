@@ -121,7 +121,20 @@ export class KeycloakTokenClient {
     const json = (await response.json()) as KeycloakTokenJson;
 
     if (!response.ok) {
-      const description = json.error_description ?? json.error ?? "Token request failed";
+      const description =
+        json.error_description ?? json.error ?? "Token request failed";
+      const normalized = description.toLowerCase();
+
+      // Keycloak often returns invalid_grant for incomplete profiles / required
+      // actions; surface that distinctly from bad credentials.
+      if (
+        normalized.includes("account is not fully set up") ||
+        normalized.includes("account not fully set up")
+      ) {
+        throw badRequest(
+          "Account setup is incomplete. Contact support if this persists.",
+        );
+      }
 
       if (response.status === 401 || json.error === "invalid_grant") {
         throw unauthorized("Invalid email or password");

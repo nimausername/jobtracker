@@ -58,7 +58,7 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
       const userAgent =
         typeof userAgentHeader === "string" ? userAgentHeader : undefined;
 
-      const tokens = await opts.authService.register({
+      const result = await opts.authService.register({
         email: body.email,
         password: body.password,
         acceptedLegal: body.acceptedLegal,
@@ -68,10 +68,8 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
         ...(userAgent ? { userAgent } : {}),
       });
 
-      setAuthCookies(reply, tokens, app.env);
-
       return reply.status(201).send({
-        data: toAuthSession(tokens),
+        data: result,
         meta: { requestId: request.id },
       });
     },

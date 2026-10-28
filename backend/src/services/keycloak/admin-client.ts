@@ -8,6 +8,43 @@ export type CreateUserInput = {
   readonly name?: string;
 };
 
+type KeycloakUserRepresentation = {
+  readonly id?: string;
+  readonly username?: string;
+  readonly email?: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
+  readonly enabled?: boolean;
+  readonly emailVerified?: boolean;
+  readonly requiredActions?: readonly string[];
+};
+
+/**
+ * Derives first/last name for Keycloak user profile requirements.
+ * Realms with VERIFY_PROFILE often require both attributes; a single
+ * given name alone leaves Direct Access Grants failing with invalid_grant.
+ */
+export const resolveDisplayNames = (
+  email: string,
+  name?: string,
+): { readonly firstName: string; readonly lastName: string } => {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  const emailLocal = email.split("@")[0]?.trim() || "User";
+
+  if (parts.length === 0) {
+    return { firstName: emailLocal, lastName: emailLocal };
+  }
+
+  if (parts.length === 1) {
+    return { firstName: parts[0]!, lastName: parts[0]! };
+  }
+
+  return {
+    firstName: parts[0]!,
+    lastName: parts.slice(1).join(" "),
+  };
+};
+
 /**
  * Keycloak Admin API helpers for user provisioning.
  */
@@ -18,13 +55,12 @@ export class KeycloakAdminClient {
   ) {}
 
   /**
-   * Creates an enabled user with a permanent password.
+   * Creates an enabled user with a permanent password and no pending actions.
    */
   async createUser(input: CreateUserInput): Promise<{ readonly id: string }> {
     const accessToken = await this.tokenClient.getClientCredentialsToken();
-
-    const [firstName, ...rest] = (input.name ?? "").trim().split(/\s+/);
-    const lastName = rest.join(" ");
+    const email = input.email.toLowerCase();
+    const { firstName, lastName } = resolveDisplayNames(email, input.name);
 
     const createResponse = await fetch(this.urls.usersUrl, {
       method: "POST",
@@ -33,12 +69,20 @@ export class KeycloakAdminClient {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        username: input.email.toLowerCase(),
-        email: input.email.toLowerCase(),
+        username: email,
+        email,
         enabled: true,
         emailVerified: true,
-        firstName: firstName || undefined,
-        lastName: lastName || undefined,
+        firstName,
+        lastName,
+        requiredActions: [],
+        credentials: [
+          {
+            type: "password",
+            value: input.password,
+            temporary: false,
+          },
+        ],
       }),
     });
 
@@ -58,43 +102,16 @@ export class KeycloakAdminClient {
     const location = createResponse.headers.get("location");
     const idFromLocation = location?.split("/").filter(Boolean).at(-1);
     const id =
-      idFromLocation ??
-      (await this.findUserIdByEmail(accessToken, input.email.toLowerCase()));
+      idFromLocation ?? (await this.findUserIdByEmail(accessToken, email));
 
     if (!id) {
       throw new AppError("INTERNAL", "Created user but could not resolve id", 502);
     }
 
-    await this.setPassword(accessToken, id, input.password);
+    // Realm defaults can still attach VERIFY_PROFILE / VERIFY_EMAIL after create.
+    await this.clearRequiredActions(accessToken, id);
+
     return { id };
-  }
-
-  private async setPassword(
-    accessToken: string,
-    userId: string,
-    password: string,
-  ): Promise<void> {
-    const response = await fetch(`${this.urls.usersUrl}/${userId}/reset-password`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        type: "password",
-        value: password,
-        temporary: false,
-      }),
-    });
-
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new AppError(
-        "INTERNAL",
-        `Failed to set user password: ${detail || response.statusText}`,
-        502,
-      );
-    }
   }
 
   /**
@@ -118,6 +135,49 @@ export class KeycloakAdminClient {
       throw new AppError(
         "INTERNAL",
         `Failed to delete Keycloak user: ${detail || response.statusText}`,
+        502,
+      );
+    }
+  }
+
+  private async clearRequiredActions(
+    accessToken: string,
+    userId: string,
+  ): Promise<void> {
+    const getResponse = await fetch(`${this.urls.usersUrl}/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!getResponse.ok) {
+      return;
+    }
+
+    const user = (await getResponse.json()) as KeycloakUserRepresentation;
+    if (!user.requiredActions || user.requiredActions.length === 0) {
+      return;
+    }
+
+    const putResponse = await fetch(`${this.urls.usersUrl}/${userId}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...user,
+        enabled: true,
+        emailVerified: true,
+        requiredActions: [],
+      }),
+    });
+
+    if (!putResponse.ok) {
+      const detail = await putResponse.text();
+      throw new AppError(
+        "INTERNAL",
+        `Failed to clear required actions: ${detail || putResponse.statusText}`,
         502,
       );
     }

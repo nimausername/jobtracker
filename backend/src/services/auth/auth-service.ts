@@ -1,5 +1,3 @@
-import { decodeJwt } from "jose";
-
 import type { Env } from "../../config/env.js";
 import { badRequest } from "../../lib/errors.js";
 import { LEGAL_DOCUMENTS_VERSION } from "../../lib/legal-documents.js";
@@ -19,6 +17,10 @@ export type RegisterInput = {
   readonly documentsVersion: string;
   readonly ipAddress?: string;
   readonly userAgent?: string;
+};
+
+export type RegisterResult = {
+  readonly created: true;
 };
 
 export type LoginInput = {
@@ -51,9 +53,10 @@ export class AuthService {
   }
 
   /**
-   * Registers a user in Keycloak, records legal acceptance, and returns tokens.
+   * Registers a user in Keycloak and records legal acceptance.
+   * Does not create a session; the client should send the user to login.
    */
-  async register(input: RegisterInput): Promise<TokenResponse> {
+  async register(input: RegisterInput): Promise<RegisterResult> {
     if (input.documentsVersion !== LEGAL_DOCUMENTS_VERSION) {
       throw badRequest(
         "Legal documents version is outdated. Refresh the page and try again.",
@@ -61,34 +64,28 @@ export class AuthService {
       );
     }
 
-    await this.adminClient.createUser({
+    const { id: userId } = await this.adminClient.createUser({
       email: input.email,
       password: input.password,
       ...(input.name ? { name: input.name } : {}),
     });
 
-    const tokens = await this.tokenClient.passwordGrant(
-      input.email.toLowerCase(),
-      input.password,
-    );
-
-    const payload = decodeJwt(tokens.accessToken);
-    const userId = typeof payload.sub === "string" ? payload.sub : null;
-    if (!userId) {
-      throw badRequest("Unable to resolve user identity after registration");
+    try {
+      await this.legalAcceptancesRepository.create({
+        userId,
+        email: input.email,
+        documentsVersion: input.documentsVersion,
+        acceptedTerms: true,
+        acceptedPrivacy: true,
+        ...(input.ipAddress ? { ipAddress: input.ipAddress } : {}),
+        ...(input.userAgent ? { userAgent: input.userAgent } : {}),
+      });
+    } catch (error) {
+      await this.adminClient.deleteUser(userId).catch(() => undefined);
+      throw error;
     }
 
-    await this.legalAcceptancesRepository.create({
-      userId,
-      email: input.email,
-      documentsVersion: input.documentsVersion,
-      acceptedTerms: true,
-      acceptedPrivacy: true,
-      ...(input.ipAddress ? { ipAddress: input.ipAddress } : {}),
-      ...(input.userAgent ? { userAgent: input.userAgent } : {}),
-    });
-
-    return tokens;
+    return { created: true };
   }
 
   /**

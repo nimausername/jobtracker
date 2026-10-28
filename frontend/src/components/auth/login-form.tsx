@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState, type FormEvent } from "react";
 import { LoaderCircleIcon } from "lucide-react";
 
 import { AuthCard } from "@/components/auth/auth-card";
@@ -21,15 +21,18 @@ import { ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 /**
- * Sign-in form adapted from ReUI c-card-12, wired to the Job Tracker API.
+ * Sign-in form body; wrapped for `useSearchParams` Suspense requirements.
  */
-export const LoginForm = () => {
+const LoginFormContent = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const justRegistered = searchParams.get("registered") === "1";
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -67,8 +70,17 @@ export const LoginForm = () => {
       }
     >
       <form className="grid gap-6" onSubmit={handleSubmit} noValidate>
+        {justRegistered ? (
+          <p
+            className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground"
+            role="status"
+          >
+            Account created successfully. Sign in with your new credentials.
+          </p>
+        ) : null}
+
         <FieldGroup>
-          <Field data-invalid={error ? true : undefined}>
+          <Field data-invalid={Boolean(error) || undefined}>
             <FieldLabel htmlFor="login-email">Email address</FieldLabel>
             <Input
               id="login-email"
@@ -114,5 +126,16 @@ export const LoginForm = () => {
         </Button>
       </form>
     </AuthCard>
+  );
+};
+
+/**
+ * Sign-in form adapted from ReUI c-card-12, wired to the Job Tracker API.
+ */
+export const LoginForm = () => {
+  return (
+    <Suspense fallback={null}>
+      <LoginFormContent />
+    </Suspense>
   );
 };
