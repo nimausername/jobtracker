@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, refreshSession } from "./client";
 import type { AuthSession, AuthUser } from "./types";
 
 export type RegisterInput = {
@@ -49,3 +49,9 @@ export const logoutRequest = (): Promise<void> =>
  */
 export const meRequest = (): Promise<AuthUser> =>
   apiRequest<AuthUser>("/v1/auth/me", { method: "GET" });
+
+/**
+ * Proactively refreshes the cookie-backed session.
+ */
+export const refreshRequest = (): Promise<AuthSession | null> =>
+  refreshSession();

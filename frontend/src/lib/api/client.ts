@@ -37,29 +37,64 @@ type RequestOptions = {
   readonly skipRefresh?: boolean;
 };
 
-let refreshPromise: Promise<boolean> | null = null;
+type AuthSessionHandlers = {
+  readonly onRefreshed?: (session: AuthSession) => void;
+  readonly onExpired?: () => void;
+};
 
-const refreshSession = async (): Promise<boolean> => {
-  try {
-    const response = await fetch(`${getBaseUrl()}/v1/auth/refresh`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify({}),
-    });
+let refreshPromise: Promise<AuthSession | null> | null = null;
+let authSessionHandlers: AuthSessionHandlers = {};
 
-    if (!response.ok) {
-      return false;
-    }
+/**
+ * Registers callbacks for session refresh success and permanent expiry.
+ */
+export const setAuthSessionHandlers = (
+  handlers: AuthSessionHandlers,
+): void => {
+  authSessionHandlers = handlers;
+};
 
-    await response.json();
-    return true;
-  } catch {
-    return false;
+/**
+ * Refreshes the cookie-backed session via the API.
+ * Single-flights concurrent callers onto one network request.
+ */
+export const refreshSession = async (): Promise<AuthSession | null> => {
+  if (refreshPromise) {
+    return refreshPromise;
   }
+
+  refreshPromise = (async (): Promise<AuthSession | null> => {
+    try {
+      const response = await fetch(`${getBaseUrl()}/v1/auth/refresh`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        // Only treat auth rejections as permanent expiry; keep UI session on blips.
+        if (response.status === 400 || response.status === 401) {
+          authSessionHandlers.onExpired?.();
+        }
+        return null;
+      }
+
+      const json = (await response.json()) as ApiSuccess<AuthSession>;
+      const session = json.data;
+      authSessionHandlers.onRefreshed?.(session);
+      return session;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
 };
 
 /**
@@ -90,10 +125,7 @@ export const apiRequest = async <T>(
     options.auth !== false &&
     !options.skipRefresh
   ) {
-    refreshPromise ??= refreshSession().finally(() => {
-      refreshPromise = null;
-    });
-    const refreshed = await refreshPromise;
+    const refreshed = await refreshSession();
     if (refreshed) {
       return apiRequest<T>(path, { ...options, skipRefresh: true });
     }

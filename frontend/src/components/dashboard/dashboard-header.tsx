@@ -1,6 +1,7 @@
 "use client";
 
 import { DashboardBreadcrumbs } from "@/components/dashboard/dashboard-breadcrumbs";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
@@ -15,6 +16,7 @@ export const DashboardHeader = () => {
       <div className="min-w-0 flex-1">
         <DashboardBreadcrumbs />
       </div>
+      <ThemeToggle />
     </header>
   );
 };
