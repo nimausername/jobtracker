@@ -6,9 +6,28 @@ import type { TokenResponse } from "../services/keycloak/token-client.js";
 export const ACCESS_COOKIE = "jt_access";
 export const REFRESH_COOKIE = "jt_refresh";
 
+/**
+ * Keycloak returns refresh_expires_in: 0 for offline tokens when
+ * "Offline Session Max Limited" is disabled. Max-Age=0 deletes the cookie,
+ * so fall back to Offline Session Idle (30 days) for cookie persistence.
+ */
+export const OFFLINE_REFRESH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+
 type CookieOptions = {
   readonly maxAgeSeconds: number;
   readonly env: Env;
+};
+
+/**
+ * Resolves refresh-cookie Max-Age from Keycloak's refresh_expires_in.
+ */
+export const resolveRefreshCookieMaxAge = (
+  refreshExpiresIn: number,
+): number => {
+  if (refreshExpiresIn > 0) {
+    return Math.floor(refreshExpiresIn);
+  }
+  return OFFLINE_REFRESH_COOKIE_MAX_AGE_SECONDS;
 };
 
 /**
@@ -102,7 +121,7 @@ export const setAuthCookies = (
       env,
     }),
     serializeCookie(REFRESH_COOKIE, tokens.refreshToken, {
-      maxAgeSeconds: tokens.refreshExpiresIn,
+      maxAgeSeconds: resolveRefreshCookieMaxAge(tokens.refreshExpiresIn),
       env,
     }),
   ]);
