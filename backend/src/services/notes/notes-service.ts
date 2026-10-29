@@ -6,15 +6,6 @@ import type {
   CreateNoteBody,
 } from "../../schemas/notes.js";
 
-const statusLabel: Record<ApplicationStatus, string> = {
-  wishlist: "Wishlist",
-  applied: "Applied",
-  interview: "Interview",
-  offer: "Offer",
-  rejected: "Rejected",
-  withdrawn: "Withdrawn",
-};
-
 type PublicActivity = {
   readonly id: string;
   readonly applicationId: string;
