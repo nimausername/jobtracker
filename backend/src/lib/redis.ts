@@ -6,27 +6,48 @@ export type RedisClient = Redis;
 
 /**
  * Creates a Redis client when REDIS_URL is configured; otherwise null.
- * Returns null (and logs) if Redis is unreachable or credentials are wrong,
- * so the API can fall back to in-memory rate limits.
+ * Returns null (and logs) if the initial connection/auth fails.
+ * Keeps reconnecting afterward so a dropped Coolify Redis link does not
+ * turn every rate-limited request into a 500.
  */
 export const createRedisClient = async (
   env: Env,
-  log?: { readonly warn: (obj: unknown, msg?: string) => void },
+  log?: {
+    readonly warn: (obj: unknown, msg?: string) => void;
+    readonly info?: (obj: unknown, msg?: string) => void;
+  },
 ): Promise<RedisClient | null> => {
   if (!env.REDIS_URL) {
     return null;
   }
 
   const redis = new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: 1,
+    maxRetriesPerRequest: 2,
     enableReadyCheck: true,
     lazyConnect: true,
     connectTimeout: 8_000,
-    retryStrategy: () => null,
+    // Reconnect after drops (Coolify Redis idle/restart). Cap backoff at 5s.
+    retryStrategy: (times) => Math.min(times * 200, 5_000),
+    reconnectOnError: (error) => {
+      const message = error.message.toUpperCase();
+      // Auth failures should not loop forever.
+      if (message.includes("WRONGPASS") || message.includes("NOAUTH")) {
+        return false;
+      }
+      return true;
+    },
   });
 
-  redis.on("error", () => {
-    // Suppress unhandled error spam; connect() failure is handled below.
+  redis.on("error", (error) => {
+    log?.warn({ err: error }, "Redis client error");
+  });
+
+  redis.on("reconnecting", () => {
+    log?.info?.({}, "Redis reconnecting");
+  });
+
+  redis.on("ready", () => {
+    log?.info?.({}, "Redis ready");
   });
 
   try {

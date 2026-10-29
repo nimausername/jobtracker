@@ -29,6 +29,8 @@ const securityPluginImpl: FastifyPluginAsync<SecurityPluginOptions> = async (
     global: true,
     max: 200,
     timeWindow: "1 minute",
+    // If Redis drops mid-flight, allow the request instead of returning 500.
+    skipOnError: true,
     ...(opts.redis ? { redis: opts.redis, nameSpace: "jobtracker-rl-" } : {}),
     // Behind Coolify / reverse proxies; trustProxy is enabled on the Fastify instance.
     addHeadersOnExceeding: {

@@ -131,20 +131,28 @@ export class AttemptThrottle {
   private async clear(key: string): Promise<void> {
     this.attempts.delete(key);
     if (this.redis) {
-      await this.redis.del(this.redisKey(key));
+      try {
+        await this.redis.del(this.redisKey(key));
+      } catch {
+        // Redis blip — local clear still applied.
+      }
     }
   }
 
   private async readState(key: string): Promise<AttemptState | null> {
     if (this.redis) {
-      const raw = await this.redis.get(this.redisKey(key));
-      if (!raw) {
-        return null;
-      }
       try {
-        return JSON.parse(raw) as AttemptState;
+        const raw = await this.redis.get(this.redisKey(key));
+        if (!raw) {
+          return this.attempts.get(key) ?? null;
+        }
+        try {
+          return JSON.parse(raw) as AttemptState;
+        } catch {
+          return this.attempts.get(key) ?? null;
+        }
       } catch {
-        return null;
+        return this.attempts.get(key) ?? null;
       }
     }
 
@@ -152,21 +160,24 @@ export class AttemptThrottle {
   }
 
   private async writeState(key: string, state: AttemptState): Promise<void> {
-    if (this.redis) {
-      const ttlMs = Math.max(
-        this.windowMs,
-        state.lockedUntil ? state.lockedUntil - Date.now() : 0,
-      );
-      await this.redis.set(
-        this.redisKey(key),
-        JSON.stringify(state),
-        "PX",
-        Math.max(ttlMs, 1000),
-      );
-      return;
-    }
-
     this.attempts.set(key, state);
+
+    if (this.redis) {
+      try {
+        const ttlMs = Math.max(
+          this.windowMs,
+          state.lockedUntil ? state.lockedUntil - Date.now() : 0,
+        );
+        await this.redis.set(
+          this.redisKey(key),
+          JSON.stringify(state),
+          "PX",
+          Math.max(ttlMs, 1000),
+        );
+      } catch {
+        // Keep in-memory copy when Redis is briefly down.
+      }
+    }
   }
 }
 
