@@ -94,6 +94,14 @@ export const accountRateLimits = {
     max: 10,
     timeWindow: "1 hour",
   },
+  updateProfile: {
+    max: 30,
+    timeWindow: "1 hour",
+  },
+  changePassword: {
+    max: 10,
+    timeWindow: "1 hour",
+  },
   delete: {
     max: 5,
     timeWindow: "1 hour",

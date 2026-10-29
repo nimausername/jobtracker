@@ -1,7 +1,7 @@
 import { AccountSettings } from "@/components/account/account-settings";
 
 /**
- * Authenticated account settings — export and delete.
+ * Authenticated account settings — profile, password, export, and delete.
  */
 const AccountPage = () => {
   return <AccountSettings />;

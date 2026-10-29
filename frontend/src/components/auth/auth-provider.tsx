@@ -48,6 +48,8 @@ type AuthContextValue = {
   ) => Promise<void>;
   readonly logout: () => Promise<void>;
   readonly refreshUser: () => Promise<void>;
+  /** Optimistically replaces the cached profile (e.g. after account edits). */
+  readonly applyUser: (next: AuthUser) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -291,6 +293,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
   }, [clearRefreshTimer]);
 
+  const applyUser = useCallback((next: AuthUser) => {
+    setUser(next);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -299,8 +305,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       register,
       logout,
       refreshUser,
+      applyUser,
     }),
-    [user, isLoading, login, register, logout, refreshUser],
+    [user, isLoading, login, register, logout, refreshUser, applyUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -15,18 +15,27 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly requestId?: string;
+  readonly details: ReadonlyArray<{
+    readonly field?: string;
+    readonly reason: string;
+  }>;
 
   constructor(
     status: number,
     code: string,
     message: string,
     requestId?: string,
+    details: ReadonlyArray<{
+      readonly field?: string;
+      readonly reason: string;
+    }> = [],
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.requestId = requestId;
+    this.details = details;
   }
 }
 
@@ -174,6 +183,7 @@ export const apiRequest = async <T>(
       errorBody.error?.code ?? "INTERNAL",
       errorBody.error?.message ?? "Request failed",
       errorBody.meta?.requestId,
+      errorBody.error?.details ?? [],
     );
   }
 

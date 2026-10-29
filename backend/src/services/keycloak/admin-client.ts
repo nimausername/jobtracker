@@ -196,6 +196,79 @@ export class KeycloakAdminClient {
   }
 
   /**
+   * Updates first/last name on a Keycloak user and returns the saved profile.
+   */
+  async updateProfile(
+    userId: string,
+    input: { readonly firstName: string; readonly lastName: string },
+  ): Promise<{
+    readonly id: string;
+    readonly email: string | null;
+    readonly firstName: string;
+    readonly lastName: string;
+    readonly name: string;
+  }> {
+    const accessToken = await this.tokenClient.getClientCredentialsToken();
+    const getResponse = await fetch(`${this.urls.usersUrl}/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (getResponse.status === 404) {
+      throw new AppError("NOT_FOUND", "User not found", 404);
+    }
+
+    if (!getResponse.ok) {
+      const detail = await getResponse.text();
+      throw new AppError(
+        "INTERNAL",
+        `Failed to load Keycloak user: ${detail || getResponse.statusText}`,
+        502,
+      );
+    }
+
+    const user = (await getResponse.json()) as KeycloakUserRepresentation;
+    const firstName = input.firstName.trim();
+    const lastName = input.lastName.trim();
+
+    const putResponse = await fetch(`${this.urls.usersUrl}/${userId}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...user,
+        firstName,
+        lastName,
+        enabled: user.enabled ?? true,
+        emailVerified: user.emailVerified ?? true,
+      }),
+    });
+
+    if (!putResponse.ok) {
+      const detail = await putResponse.text();
+      throw new AppError(
+        "INTERNAL",
+        `Failed to update Keycloak user: ${detail || putResponse.statusText}`,
+        502,
+      );
+    }
+
+    const email = user.email ?? null;
+    const name = `${firstName} ${lastName}`.trim();
+
+    return {
+      id: userId,
+      email,
+      firstName,
+      lastName,
+      name,
+    };
+  }
+
+  /**
    * Sets a permanent password for a Keycloak user.
    */
   async setPassword(userId: string, password: string): Promise<void> {

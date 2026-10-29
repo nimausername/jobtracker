@@ -25,6 +25,7 @@ type PasswordFieldProps = {
   readonly minLength?: number;
   readonly description?: string;
   readonly disabled?: boolean;
+  readonly invalid?: boolean;
   readonly labelAction?: ReactNode;
 };
 
@@ -43,6 +44,7 @@ export const PasswordField = ({
   minLength,
   description,
   disabled = false,
+  invalid = false,
   labelAction,
 }: PasswordFieldProps) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -52,7 +54,7 @@ export const PasswordField = ({
   };
 
   return (
-    <Field>
+    <Field data-invalid={invalid || undefined}>
       <div className="flex items-center justify-between gap-3">
         <FieldLabel htmlFor={id}>{label}</FieldLabel>
         {labelAction}
@@ -73,6 +75,7 @@ export const PasswordField = ({
           minLength={minLength}
           disabled={disabled}
           aria-required={required}
+          aria-invalid={invalid || undefined}
           aria-describedby={description ? `${id}-description` : undefined}
         />
         <InputGroupAddon align="inline-end">

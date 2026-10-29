@@ -122,6 +122,15 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 | `POST` | `/v1/auth/refresh` | Refresh tokens |
 | `GET` | `/v1/auth/me` | Current user (Bearer token) |
 
+### Account
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `PATCH` | `/v1/account/profile` | Update first/last name |
+| `POST` | `/v1/account/password` | Change password (current + new) |
+| `GET` | `/v1/account/export` | Download personal data export |
+| `DELETE` | `/v1/account` | Delete account (`confirmation: DELETE`) |
+
 ### Applications & notes
 
 | Method | Path | Description |
@@ -136,7 +145,7 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 | `POST` | `/v1/applications/:id/notes` | Add note |
 | `DELETE` | `/v1/applications/:id/notes/:noteId` | Delete note |
 
-UI routes: `/login`, `/register`, `/forgot-password`, `/reset-password`, `/dashboard`, `/dashboard/applications`.
+UI routes: `/login`, `/register`, `/forgot-password`, `/reset-password`, `/dashboard`, `/dashboard/applications`, `/dashboard/account`.
 
 Password reset stays in the app: the API emails a link to `/reset-password`, then sets the Keycloak password via Admin API. Configure SMTP (`SMTP_*`) for that email path.
 

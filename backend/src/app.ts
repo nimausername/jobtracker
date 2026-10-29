@@ -71,6 +71,7 @@ export const buildApp = async (deps: AppDeps) => {
   const accountService = new AccountService(
     new AccountRepository(deps.db),
     new KeycloakAdminClient(keycloakUrls, keycloakTokenClient),
+    keycloakTokenClient,
   );
 
   const redis = await createRedisClient(deps.env, app.log);
