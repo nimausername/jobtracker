@@ -42,10 +42,16 @@ export class SmtpMailer {
       ? `${env.SMTP_FROM_NAME} <${env.SMTP_FROM!}>`
       : env.SMTP_FROM!;
 
+    // 465 = implicit TLS (secure:true). 587 = plain then STARTTLS (secure:false).
+    // Mis-setting SMTP_SECURE=true on 587 causes OpenSSL "wrong version number".
+    const useImplicitTls =
+      env.SMTP_PORT === 465 ? true : env.SMTP_PORT === 587 ? false : env.SMTP_SECURE;
+
     this.transporter = createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
-      secure: env.SMTP_SECURE,
+      secure: useImplicitTls,
+      requireTLS: !useImplicitTls,
       connectionTimeout: SMTP_TIMEOUT_MS,
       greetingTimeout: SMTP_TIMEOUT_MS,
       socketTimeout: SMTP_TIMEOUT_MS,
