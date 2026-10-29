@@ -50,6 +50,7 @@ export const verifyTurnstileToken = async (input: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
         body,
+        signal: AbortSignal.timeout(10_000),
       },
     );
     result = (await response.json()) as SiteverifyResponse;

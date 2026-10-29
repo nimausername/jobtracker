@@ -82,14 +82,22 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
       // Count every request toward the per-email budget (including successful sends).
       await forgotPasswordThrottle.recordFailure(emailKey);
 
-      const result = await opts.authService.forgotPassword({
-        email: body.email,
-      });
+      try {
+        const result = await opts.authService.forgotPassword({
+          email: body.email,
+        });
 
-      return {
-        data: result,
-        meta: { requestId: request.id },
-      };
+        return {
+          data: result,
+          meta: { requestId: request.id },
+        };
+      } catch (error) {
+        request.log.error(
+          { err: error, email: body.email },
+          "Forgot-password request failed",
+        );
+        throw error;
+      }
     },
   );
 

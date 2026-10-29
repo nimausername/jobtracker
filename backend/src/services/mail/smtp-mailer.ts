@@ -10,6 +10,8 @@ export type SendMailInput = {
   readonly html: string;
 };
 
+const SMTP_TIMEOUT_MS = 12_000;
+
 /**
  * Returns whether SMTP env is complete enough to send mail.
  */
@@ -22,6 +24,8 @@ export const isSmtpConfigured = (env: Env): boolean =>
 export class SmtpMailer {
   private readonly transporter: Transporter;
   private readonly from: string;
+  private readonly host: string;
+  private readonly port: number;
 
   constructor(env: Env) {
     if (!isSmtpConfigured(env)) {
@@ -32,6 +36,8 @@ export class SmtpMailer {
       );
     }
 
+    this.host = env.SMTP_HOST!;
+    this.port = env.SMTP_PORT;
     this.from = env.SMTP_FROM_NAME
       ? `${env.SMTP_FROM_NAME} <${env.SMTP_FROM!}>`
       : env.SMTP_FROM!;
@@ -40,6 +46,9 @@ export class SmtpMailer {
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
+      connectionTimeout: SMTP_TIMEOUT_MS,
+      greetingTimeout: SMTP_TIMEOUT_MS,
+      socketTimeout: SMTP_TIMEOUT_MS,
       auth: {
         user: env.SMTP_USER,
         pass: env.SMTP_PASS,
@@ -51,12 +60,23 @@ export class SmtpMailer {
    * Sends a transactional email through the configured SMTP mailbox.
    */
   async send(input: SendMailInput): Promise<void> {
-    await this.transporter.sendMail({
-      from: this.from,
-      to: input.to,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-    });
+    try {
+      await this.transporter.sendMail({
+        from: this.from,
+        to: input.to,
+        subject: input.subject,
+        text: input.text,
+        html: input.html,
+      });
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message : "Unknown SMTP error";
+      throw new AppError(
+        "INTERNAL",
+        `Unable to send email via ${this.host}:${this.port}. ${detail}`,
+        502,
+        [{ field: "email", reason: "SMTP_SEND_FAILED" }],
+      );
+    }
   }
 }
