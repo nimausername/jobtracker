@@ -30,14 +30,20 @@ const REFRESH_RATIO = 0.8;
 type AuthContextValue = {
   readonly user: AuthUser | null;
   readonly isLoading: boolean;
-  readonly login: (email: string, password: string) => Promise<void>;
+  readonly login: (
+    email: string,
+    password: string,
+    options?: { readonly turnstileToken?: string },
+  ) => Promise<void>;
   readonly register: (
     email: string,
     password: string,
     options: {
-      readonly name?: string;
+      readonly firstName: string;
+      readonly lastName: string;
       readonly acceptedLegal: true;
       readonly documentsVersion: string;
+      readonly turnstileToken?: string;
     },
   ) => Promise<void>;
   readonly logout: () => Promise<void>;
@@ -229,8 +235,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [scheduleRefresh]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const session = await loginRequest({ email, password });
+    async (
+      email: string,
+      password: string,
+      options?: { readonly turnstileToken?: string },
+    ) => {
+      const session = await loginRequest({
+        email,
+        password,
+        ...(options?.turnstileToken
+          ? { turnstileToken: options.turnstileToken }
+          : {}),
+      });
       const profile = await meRequest();
       setUser(profile);
       scheduleRefresh(session.expiresIn);
@@ -243,17 +259,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       email: string,
       password: string,
       options: {
-        readonly name?: string;
+        readonly firstName: string;
+        readonly lastName: string;
         readonly acceptedLegal: true;
         readonly documentsVersion: string;
+        readonly turnstileToken?: string;
       },
     ) => {
       await registerRequest({
         email,
         password,
+        firstName: options.firstName,
+        lastName: options.lastName,
         acceptedLegal: options.acceptedLegal,
         documentsVersion: options.documentsVersion,
-        ...(options.name ? { name: options.name } : {}),
+        ...(options.turnstileToken
+          ? { turnstileToken: options.turnstileToken }
+          : {}),
       });
     },
     [],

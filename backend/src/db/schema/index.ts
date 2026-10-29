@@ -6,3 +6,4 @@ export {
   workArrangementEnum,
 } from "./applications.js";
 export { legalAcceptances } from "./legal-acceptances.js";
+export { passwordResetTokens } from "./password-reset-tokens.js";

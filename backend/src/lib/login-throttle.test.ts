@@ -1,40 +1,43 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { AppError, ErrorCode } from "./errors.js";
-import { LoginThrottle, loginThrottleKey } from "./login-throttle.js";
+import { AttemptThrottle, loginThrottleKey } from "./login-throttle.js";
 
-describe("LoginThrottle", () => {
-  let throttle: LoginThrottle;
+describe("AttemptThrottle", () => {
+  let throttle: AttemptThrottle;
 
   beforeEach(() => {
-    throttle = new LoginThrottle({
+    throttle = new AttemptThrottle({
+      prefix: "test-login",
       maxFailures: 3,
       windowMs: 60_000,
       lockoutMs: 120_000,
     });
   });
 
-  it("allows attempts before the failure limit", () => {
+  it("allows attempts before the failure limit", async () => {
     const key = loginThrottleKey("user@example.com", "1.2.3.4");
-    expect(() => throttle.assertAllowed(key)).not.toThrow();
-    throttle.recordFailure(key);
-    throttle.recordFailure(key);
-    expect(throttle.getFailureCount(key)).toBe(2);
-    expect(() => throttle.assertAllowed(key)).not.toThrow();
+    await expect(throttle.assertAllowed(key)).resolves.toBeUndefined();
+    await throttle.recordFailure(key);
+    await throttle.recordFailure(key);
+    await expect(throttle.getFailureCount(key)).resolves.toBe(2);
+    await expect(throttle.assertAllowed(key)).resolves.toBeUndefined();
   });
 
-  it("locks after max failures and unlocks after lockout", () => {
+  it("locks after max failures and unlocks after lockout", async () => {
     const key = loginThrottleKey("user@example.com", "1.2.3.4");
     const t0 = 1_000_000;
 
-    throttle.recordFailure(key, t0);
-    throttle.recordFailure(key, t0 + 1);
-    throttle.recordFailure(key, t0 + 2);
+    await throttle.recordFailure(key, t0);
+    await throttle.recordFailure(key, t0 + 1);
+    await throttle.recordFailure(key, t0 + 2);
 
-    expect(() => throttle.assertAllowed(key, t0 + 3)).toThrow(AppError);
+    await expect(throttle.assertAllowed(key, t0 + 3)).rejects.toBeInstanceOf(
+      AppError,
+    );
 
     try {
-      throttle.assertAllowed(key, t0 + 3);
+      await throttle.assertAllowed(key, t0 + 3);
     } catch (error) {
       expect(error).toBeInstanceOf(AppError);
       expect((error as AppError).code).toBe(ErrorCode.RATE_LIMITED);
@@ -42,27 +45,26 @@ describe("LoginThrottle", () => {
       expect((error as AppError).retryAfterSeconds).toBeGreaterThan(0);
     }
 
-    // Lock started at t0+2 with lockoutMs=120_000 → expires at t0+120_002.
-    expect(() =>
+    await expect(
       throttle.assertAllowed(key, t0 + 122_000),
-    ).not.toThrow();
+    ).resolves.toBeUndefined();
   });
 
-  it("clears failures on success", () => {
+  it("clears failures on success", async () => {
     const key = loginThrottleKey("user@example.com", "1.2.3.4");
-    throttle.recordFailure(key);
-    throttle.recordFailure(key);
-    throttle.recordSuccess(key);
-    expect(throttle.getFailureCount(key)).toBe(0);
+    await throttle.recordFailure(key);
+    await throttle.recordFailure(key);
+    await throttle.recordSuccess(key);
+    await expect(throttle.getFailureCount(key)).resolves.toBe(0);
   });
 
-  it("isolates keys by email and IP", () => {
+  it("isolates keys by email and IP", async () => {
     const a = loginThrottleKey("a@example.com", "1.1.1.1");
     const b = loginThrottleKey("a@example.com", "2.2.2.2");
-    throttle.recordFailure(a);
-    throttle.recordFailure(a);
-    throttle.recordFailure(a);
-    expect(() => throttle.assertAllowed(a)).toThrow();
-    expect(() => throttle.assertAllowed(b)).not.toThrow();
+    await throttle.recordFailure(a);
+    await throttle.recordFailure(a);
+    await throttle.recordFailure(a);
+    await expect(throttle.assertAllowed(a)).rejects.toBeInstanceOf(AppError);
+    await expect(throttle.assertAllowed(b)).resolves.toBeUndefined();
   });
 });

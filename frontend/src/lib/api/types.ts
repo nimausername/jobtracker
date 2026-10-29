@@ -49,6 +49,8 @@ export type AuthUser = {
   readonly id: string;
   readonly email: string | null;
   readonly name: string | null;
+  readonly firstName: string | null;
+  readonly lastName: string | null;
 };
 
 /**
@@ -60,6 +62,8 @@ export type AccountExport = {
     readonly id: string;
     readonly email: string | null;
     readonly name: string | null;
+    readonly firstName: string | null;
+    readonly lastName: string | null;
   };
   readonly applications: ReadonlyArray<Record<string, unknown>>;
   readonly applicationNotes: ReadonlyArray<Record<string, unknown>>;

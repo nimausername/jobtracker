@@ -116,6 +116,9 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 | --- | --- | --- |
 | `POST` | `/v1/auth/register` | Create Keycloak user (then sign in via login) |
 | `POST` | `/v1/auth/login` | Email/password login |
+| `GET` | `/v1/auth/public-config` | Public auth flags (Turnstile site key) |
+| `POST` | `/v1/auth/forgot-password` | Email an in-app password-reset link |
+| `POST` | `/v1/auth/reset-password` | Complete password reset with token |
 | `POST` | `/v1/auth/refresh` | Refresh tokens |
 | `GET` | `/v1/auth/me` | Current user (Bearer token) |
 
@@ -133,7 +136,13 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 | `POST` | `/v1/applications/:id/notes` | Add note |
 | `DELETE` | `/v1/applications/:id/notes/:noteId` | Delete note |
 
-UI routes: `/login`, `/register`, `/dashboard`, `/dashboard/applications`.
+UI routes: `/login`, `/register`, `/forgot-password`, `/reset-password`, `/dashboard`, `/dashboard/applications`.
+
+Password reset stays in the app: the API emails a link to `/reset-password`, then sets the Keycloak password via Admin API. Configure SMTP (`SMTP_*`) for that email path.
+
+Auth abuse controls:
+- Cloudflare Turnstile on login / register / forgot-password (`TURNSTILE_*`)
+- Per-route IP rate limits; optional Redis (`REDIS_URL`) for durable limits + login/forgot lockouts
 
 ## Scripts
 

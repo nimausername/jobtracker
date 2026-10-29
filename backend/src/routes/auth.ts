@@ -9,17 +9,22 @@ import {
 import { resolveClientIp } from "../lib/client-ip.js";
 import { AppError, badRequest, ErrorCode } from "../lib/errors.js";
 import {
+  forgotPasswordThrottle,
   loginThrottle,
   loginThrottleKey,
 } from "../lib/login-throttle.js";
+import { emailThrottleKey } from "../lib/attempt-throttle.js";
 import { parseOrThrow } from "../lib/validate.js";
 import { authRateLimits } from "../plugins/security.js";
 import {
+  forgotPasswordBodySchema,
   loginBodySchema,
   registerBodySchema,
+  resetPasswordBodySchema,
 } from "../schemas/auth.js";
 import type { AuthService } from "../services/auth/auth-service.js";
 import type { TokenResponse } from "../services/keycloak/token-client.js";
+import { verifyTurnstileToken } from "../services/turnstile/verify-turnstile.js";
 
 type AuthRouteOptions = {
   readonly authService: AuthService;
@@ -44,6 +49,71 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
   app,
   opts,
 ) => {
+  app.get("/auth/public-config", async (request) => {
+    return {
+      data: {
+        turnstileSiteKey: app.env.TURNSTILE_SITE_KEY ?? null,
+        turnstileEnabled: Boolean(app.env.TURNSTILE_SECRET_KEY),
+      },
+      meta: { requestId: request.id },
+    };
+  });
+
+  app.post(
+    "/auth/forgot-password",
+    {
+      config: {
+        rateLimit: authRateLimits.forgotPassword,
+      },
+    },
+    async (request) => {
+      const body = parseOrThrow(forgotPasswordBodySchema, request.body);
+      const ip = resolveClientIp(request);
+      const emailKey = emailThrottleKey(body.email);
+
+      await forgotPasswordThrottle.assertAllowed(emailKey);
+      await verifyTurnstileToken({
+        env: app.env,
+        token: body.turnstileToken,
+        remoteIp: ip,
+        expectedAction: "forgot-password",
+      });
+
+      // Count every request toward the per-email budget (including successful sends).
+      await forgotPasswordThrottle.recordFailure(emailKey);
+
+      const result = await opts.authService.forgotPassword({
+        email: body.email,
+      });
+
+      return {
+        data: result,
+        meta: { requestId: request.id },
+      };
+    },
+  );
+
+  app.post(
+    "/auth/reset-password",
+    {
+      config: {
+        rateLimit: authRateLimits.resetPassword,
+      },
+    },
+    async (request) => {
+      const body = parseOrThrow(resetPasswordBodySchema, request.body);
+      const result = await opts.authService.resetPassword({
+        token: body.token,
+        password: body.password,
+      });
+
+      return {
+        data: result,
+        meta: { requestId: request.id },
+      };
+    },
+  );
+
   app.post(
     "/auth/register",
     {
@@ -58,11 +128,20 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
       const userAgent =
         typeof userAgentHeader === "string" ? userAgentHeader : undefined;
 
+      await verifyTurnstileToken({
+        env: app.env,
+        token: body.turnstileToken,
+        remoteIp: ipAddress,
+        expectedAction: "register",
+      });
+
       const result = await opts.authService.register({
         email: body.email,
         password: body.password,
         acceptedLegal: body.acceptedLegal,
         documentsVersion: body.documentsVersion,
+        ...(body.firstName ? { firstName: body.firstName } : {}),
+        ...(body.lastName ? { lastName: body.lastName } : {}),
         ...(body.name ? { name: body.name } : {}),
         ...(ipAddress ? { ipAddress } : {}),
         ...(userAgent ? { userAgent } : {}),
@@ -87,11 +166,20 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
       const ip = resolveClientIp(request);
       const throttleKey = loginThrottleKey(body.email, ip);
 
-      loginThrottle.assertAllowed(throttleKey);
+      await loginThrottle.assertAllowed(throttleKey);
+      await verifyTurnstileToken({
+        env: app.env,
+        token: body.turnstileToken,
+        remoteIp: ip,
+        expectedAction: "login",
+      });
 
       try {
-        const tokens = await opts.authService.login(body);
-        loginThrottle.recordSuccess(throttleKey);
+        const tokens = await opts.authService.login({
+          email: body.email,
+          password: body.password,
+        });
+        await loginThrottle.recordSuccess(throttleKey);
         setAuthCookies(reply, tokens, app.env);
 
         return {
@@ -103,7 +191,7 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
           error instanceof AppError &&
           error.code === ErrorCode.UNAUTHORIZED
         ) {
-          loginThrottle.recordFailure(throttleKey);
+          await loginThrottle.recordFailure(throttleKey);
         }
         throw error;
       }
@@ -172,6 +260,8 @@ export const authRoutes: FastifyPluginAsync<AuthRouteOptions> = async (
           id: request.user.id,
           email: request.user.email ?? null,
           name: request.user.name ?? null,
+          firstName: request.user.firstName ?? null,
+          lastName: request.user.lastName ?? null,
         },
         meta: { requestId: request.id },
       };

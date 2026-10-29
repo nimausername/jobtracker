@@ -5,6 +5,17 @@ import type { KeycloakUrls } from "./urls.js";
 export type CreateUserInput = {
   readonly email: string;
   readonly password: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
+  /** @deprecated Prefer firstName + lastName. */
+  readonly name?: string;
+};
+
+export type ResolveDisplayNamesInput = {
+  readonly email: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
+  /** @deprecated Prefer firstName + lastName. */
   readonly name?: string;
 };
 
@@ -25,11 +36,17 @@ type KeycloakUserRepresentation = {
  * given name alone leaves Direct Access Grants failing with invalid_grant.
  */
 export const resolveDisplayNames = (
-  email: string,
-  name?: string,
+  input: ResolveDisplayNamesInput,
 ): { readonly firstName: string; readonly lastName: string } => {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  const emailLocal = email.split("@")[0]?.trim() || "User";
+  const firstName = input.firstName?.trim();
+  const lastName = input.lastName?.trim();
+
+  if (firstName && lastName) {
+    return { firstName, lastName };
+  }
+
+  const parts = (input.name ?? "").trim().split(/\s+/).filter(Boolean);
+  const emailLocal = input.email.split("@")[0]?.trim() || "User";
 
   if (parts.length === 0) {
     return { firstName: emailLocal, lastName: emailLocal };
@@ -60,7 +77,12 @@ export class KeycloakAdminClient {
   async createUser(input: CreateUserInput): Promise<{ readonly id: string }> {
     const accessToken = await this.tokenClient.getClientCredentialsToken();
     const email = input.email.toLowerCase();
-    const { firstName, lastName } = resolveDisplayNames(email, input.name);
+    const { firstName, lastName } = resolveDisplayNames({
+      email,
+      ...(input.firstName ? { firstName: input.firstName } : {}),
+      ...(input.lastName ? { lastName: input.lastName } : {}),
+      ...(input.name ? { name: input.name } : {}),
+    });
 
     const createResponse = await fetch(this.urls.usersUrl, {
       method: "POST",
@@ -112,6 +134,96 @@ export class KeycloakAdminClient {
     await this.clearRequiredActions(accessToken, id);
 
     return { id };
+  }
+
+  /**
+   * Finds a user id by exact email match.
+   */
+  async findUserIdByEmailAddress(
+    email: string,
+  ): Promise<string | undefined> {
+    const accessToken = await this.tokenClient.getClientCredentialsToken();
+    return this.findUserIdByEmail(accessToken, email.toLowerCase());
+  }
+
+  /**
+   * Emails the user a Keycloak required-action link (e.g. UPDATE_PASSWORD).
+   * Returns quietly when the user is missing so callers can avoid account enumeration.
+   */
+  async sendExecuteActionsEmail(input: {
+    readonly userId: string;
+    readonly actions: readonly string[];
+    readonly clientId?: string;
+    readonly redirectUri?: string;
+    readonly lifespanSeconds?: number;
+  }): Promise<void> {
+    const accessToken = await this.tokenClient.getClientCredentialsToken();
+    const url = new URL(
+      `${this.urls.usersUrl}/${input.userId}/execute-actions-email`,
+    );
+
+    if (input.clientId) {
+      url.searchParams.set("client_id", input.clientId);
+    }
+    if (input.redirectUri) {
+      url.searchParams.set("redirect_uri", input.redirectUri);
+    }
+    if (typeof input.lifespanSeconds === "number") {
+      url.searchParams.set("lifespan", String(input.lifespanSeconds));
+    }
+
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input.actions),
+    });
+
+    if (response.status === 404) {
+      return;
+    }
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new AppError(
+        "INTERNAL",
+        `Failed to send execute-actions email: ${detail || response.statusText}`,
+        502,
+      );
+    }
+  }
+
+  /**
+   * Sets a permanent password for a Keycloak user.
+   */
+  async setPassword(userId: string, password: string): Promise<void> {
+    const accessToken = await this.tokenClient.getClientCredentialsToken();
+    const response = await fetch(
+      `${this.urls.usersUrl}/${userId}/reset-password`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: "password",
+          value: password,
+          temporary: false,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new AppError(
+        "INTERNAL",
+        `Failed to set Keycloak password: ${detail || response.statusText}`,
+        502,
+      );
+    }
   }
 
   /**

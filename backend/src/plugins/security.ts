@@ -2,14 +2,22 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import type { FastifyPluginAsync } from "fastify";
 import fp from "fastify-plugin";
-
 import { ErrorCode } from "../lib/errors.js";
+import type { RedisClient } from "../lib/redis.js";
+
+type SecurityPluginOptions = {
+  readonly redis?: RedisClient | null;
+};
 
 /**
  * Baseline HTTP hardening: security headers + global request rate limit.
  * Auth routes override with stricter per-route configs.
+ * Uses Redis when provided so limits survive process restarts / multi-instance.
  */
-const securityPluginImpl: FastifyPluginAsync = async (app) => {
+const securityPluginImpl: FastifyPluginAsync<SecurityPluginOptions> = async (
+  app,
+  opts,
+) => {
   await app.register(helmet, {
     // API-only; CSP is enforced by the Next.js frontend origin.
     contentSecurityPolicy: false,
@@ -21,6 +29,7 @@ const securityPluginImpl: FastifyPluginAsync = async (app) => {
     global: true,
     max: 200,
     timeWindow: "1 minute",
+    ...(opts.redis ? { redis: opts.redis, nameSpace: "jobtracker-rl-" } : {}),
     // Behind Coolify / reverse proxies; trustProxy is enabled on the Fastify instance.
     addHeadersOnExceeding: {
       "x-ratelimit-limit": true,
@@ -58,6 +67,14 @@ export const authRateLimits = {
   },
   register: {
     max: 5,
+    timeWindow: "1 hour",
+  },
+  forgotPassword: {
+    max: 5,
+    timeWindow: "1 hour",
+  },
+  resetPassword: {
+    max: 10,
     timeWindow: "1 hour",
   },
   refresh: {

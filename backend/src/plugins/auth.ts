@@ -10,6 +10,8 @@ export type AuthUser = {
   readonly id: string;
   readonly email?: string;
   readonly name?: string;
+  readonly firstName?: string;
+  readonly lastName?: string;
 };
 
 declare module "fastify" {
@@ -65,12 +67,24 @@ const authPluginImpl: FastifyPluginAsync<AuthPluginOptions> = async (
         : typeof payload.preferred_username === "string"
           ? payload.preferred_username
           : undefined;
-    const name = typeof payload.name === "string" ? payload.name : undefined;
+    const firstName =
+      typeof payload.given_name === "string" ? payload.given_name : undefined;
+    const lastName =
+      typeof payload.family_name === "string" ? payload.family_name : undefined;
+    const composedName = [firstName, lastName]
+      .filter((part): part is string => Boolean(part?.trim()))
+      .join(" ");
+    const name =
+      typeof payload.name === "string" && payload.name.trim()
+        ? payload.name
+        : composedName || undefined;
 
     request.user = {
       id: payload.sub,
       ...(email ? { email } : {}),
       ...(name ? { name } : {}),
+      ...(firstName ? { firstName } : {}),
+      ...(lastName ? { lastName } : {}),
     };
   };
 

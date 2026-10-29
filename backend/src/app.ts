@@ -4,6 +4,8 @@ import Fastify from "fastify";
 import type { Env } from "./config/env.js";
 import type { Database } from "./db/client.js";
 import { AppError, ErrorCode } from "./lib/errors.js";
+import { configureAuthThrottles } from "./lib/login-throttle.js";
+import { createRedisClient } from "./lib/redis.js";
 import { resolveRequestId } from "./lib/request-id.js";
 import { authPlugin } from "./plugins/auth.js";
 import { securityPlugin } from "./plugins/security.js";
@@ -11,6 +13,7 @@ import { AccountRepository } from "./repositories/account-repository.js";
 import { ApplicationsRepository } from "./repositories/applications-repository.js";
 import { LegalAcceptancesRepository } from "./repositories/legal-acceptances-repository.js";
 import { NotesRepository } from "./repositories/notes-repository.js";
+import { PasswordResetTokensRepository } from "./repositories/password-reset-tokens-repository.js";
 import { accountRoutes } from "./routes/account.js";
 import { applicationsRoutes } from "./routes/applications.js";
 import { authRoutes } from "./routes/auth.js";
@@ -54,6 +57,7 @@ export const buildApp = async (deps: AppDeps) => {
   const authService = new AuthService(
     deps.env,
     new LegalAcceptancesRepository(deps.db),
+    new PasswordResetTokensRepository(deps.db),
   );
   const notesRepository = new NotesRepository(deps.db);
   const applicationsService = new ApplicationsService(
@@ -69,6 +73,20 @@ export const buildApp = async (deps: AppDeps) => {
     new KeycloakAdminClient(keycloakUrls, keycloakTokenClient),
   );
 
+  const redis = await createRedisClient(deps.env, app.log);
+  configureAuthThrottles(redis);
+
+  if (redis) {
+    app.log.info("Redis connected — durable rate limits enabled");
+    app.addHook("onClose", async () => {
+      await redis.quit();
+    });
+  } else if (deps.env.REDIS_URL) {
+    app.log.warn(
+      "REDIS_URL is set but Redis auth/connection failed — using in-memory limits",
+    );
+  }
+
   await app.register(cors, {
     origin: deps.env.CORS_ORIGIN,
     credentials: true,
@@ -76,7 +94,7 @@ export const buildApp = async (deps: AppDeps) => {
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
 
-  await app.register(securityPlugin);
+  await app.register(securityPlugin, { redis });
   await app.register(authPlugin, { authService });
 
   app.addHook("onRequest", async (request, reply) => {

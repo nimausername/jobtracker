@@ -50,7 +50,7 @@ export const SiteFooter = ({ className }: SiteFooterProps) => {
         </nav>
         <p className="max-w-md text-xs leading-relaxed text-white/40">
           © {new Date().getFullYear()} {SITE_INFO.operatorName}.{" "}
-          {SITE_INFO.productFullName}. {SITE_INFO.licenseName}.
+          {SITE_INFO.productName}. {SITE_INFO.licenseName}.
         </p>
       </div>
     </footer>

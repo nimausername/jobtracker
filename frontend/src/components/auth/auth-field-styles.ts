@@ -1,5 +1,5 @@
 /**
- * Slightly stronger field chrome so inputs separate from the glass auth card.
+ * Subtle field fill so inputs read clearly on the glass auth card.
+ * Matches default sheet Input chrome; avoids heavy extra borders.
  */
-export const authControlClassName =
-  "border-foreground/25 bg-background shadow-xs";
+export const authControlClassName = "bg-background";

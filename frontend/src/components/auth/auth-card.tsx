@@ -19,7 +19,8 @@ type AuthCardProps = {
 };
 
 /**
- * Shared auth card shell adapted from ReUI c-card-12 for the ASCII background.
+ * Glass auth form shell for the ASCII marketing stage (ReUI Card / c-card-12).
+ * Brand lives in AuthPageShell; this card owns the task title and form only.
  */
 export const AuthCard = ({
   title,
@@ -35,11 +36,13 @@ export const AuthCard = ({
         className,
       )}
     >
-      <CardHeader className="text-center sm:text-left">
-        <CardTitle className="font-heading text-xl font-semibold tracking-tight sm:text-2xl">
+      <CardHeader className="gap-1 text-center sm:text-left">
+        <CardTitle className="font-heading text-xl font-semibold tracking-tight">
           {title}
         </CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardDescription className="text-sm text-muted-foreground">
+          {description}
+        </CardDescription>
       </CardHeader>
       <CardContent>{children}</CardContent>
       <CardFooter className="border-white/10 bg-transparent">

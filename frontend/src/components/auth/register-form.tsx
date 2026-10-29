@@ -3,25 +3,28 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { LoaderCircleIcon } from "lucide-react";
+import {
+  LoaderCircleIcon,
+  MailIcon,
+  UserIcon,
+  UserRoundIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { AuthCard } from "@/components/auth/auth-card";
-import { authControlClassName } from "@/components/auth/auth-field-styles";
+import { AuthTextField } from "@/components/auth/auth-text-field";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PasswordField } from "@/components/auth/password-field";
+import {
+  resetTurnstileWidgets,
+  TurnstileWidget,
+} from "@/components/auth/turnstile-widget";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { FieldError, FieldGroup } from "@/components/ui/field";
+import { useTurnstileConfig } from "@/hooks/use-turnstile-config";
 import { ApiError } from "@/lib/api/client";
 import { SITE_INFO } from "@/lib/legal/site-info";
-import { cn } from "@/lib/utils";
 
 /**
  * Registration form adapted from ReUI c-card-12, wired to the Job Tracker API.
@@ -29,19 +32,37 @@ import { cn } from "@/lib/utils";
 export const RegisterForm = () => {
   const router = useRouter();
   const { register } = useAuth();
-  const [name, setName] = useState("");
+  const turnstile = useTurnstileConfig();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const turnstileReady = !turnstile.enabled || Boolean(turnstileToken);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
 
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+
+    if (!trimmedFirstName || !trimmedLastName) {
+      setError("Enter your first and last name.");
+      return;
+    }
+
     if (!acceptedLegal) {
       setError("You must accept the Terms of Service and Privacy Policy.");
+      return;
+    }
+
+    if (turnstile.enabled && !turnstileToken) {
+      setError("Complete the security check and try again.");
       return;
     }
 
@@ -49,13 +70,17 @@ export const RegisterForm = () => {
 
     try {
       await register(email.trim(), password, {
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
         acceptedLegal: true,
         documentsVersion: SITE_INFO.documentsVersion,
-        ...(name.trim() ? { name: name.trim() } : {}),
+        ...(turnstileToken ? { turnstileToken } : {}),
       });
       toast.success("Account created. Please sign in.");
       router.replace("/login?registered=1");
     } catch (err) {
+      resetTurnstileWidgets();
+      setTurnstileToken(null);
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
@@ -69,12 +94,12 @@ export const RegisterForm = () => {
   return (
     <AuthCard
       title="Create account"
-      description="Start tracking applications with a free account."
+      description="Start tracking applications."
       footer={
         <>
           Already have an account?{" "}
           <Link
-            className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+            className="font-medium text-foreground underline underline-offset-4 transition-colors duration-200 hover:text-primary"
             href="/login"
           >
             Sign in
@@ -82,38 +107,50 @@ export const RegisterForm = () => {
         </>
       }
     >
-      <form className="grid gap-6" onSubmit={handleSubmit} noValidate>
-        <FieldGroup>
-          <Field>
-            <FieldLabel htmlFor="register-name">Name</FieldLabel>
-            <Input
-              id="register-name"
-              name="name"
-              autoComplete="name"
-              placeholder="Optional"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              disabled={isSubmitting}
-              className={cn(authControlClassName)}
-            />
-          </Field>
-
-          <Field data-invalid={Boolean(error) || undefined}>
-            <FieldLabel htmlFor="register-email">Email address</FieldLabel>
-            <Input
-              id="register-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+      <form className="grid gap-5" onSubmit={handleSubmit} noValidate>
+        <FieldGroup className="gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <AuthTextField
+              id="register-first-name"
+              name="given-name"
+              label="First name"
+              icon={UserIcon}
+              autoComplete="given-name"
+              placeholder="Ada"
+              value={firstName}
+              onChange={(event) => setFirstName(event.target.value)}
               required
-              aria-required="true"
               disabled={isSubmitting}
-              className={cn(authControlClassName)}
             />
-          </Field>
+
+            <AuthTextField
+              id="register-last-name"
+              name="family-name"
+              label="Last name"
+              icon={UserRoundIcon}
+              autoComplete="family-name"
+              placeholder="Lovelace"
+              value={lastName}
+              onChange={(event) => setLastName(event.target.value)}
+              required
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <AuthTextField
+            id="register-email"
+            name="email"
+            label="Email"
+            icon={MailIcon}
+            type="email"
+            autoComplete="email"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            disabled={isSubmitting}
+            invalid={Boolean(error)}
+          />
 
           <PasswordField
             id="register-password"
@@ -122,7 +159,7 @@ export const RegisterForm = () => {
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="new-password"
             minLength={8}
-            description="At least 8 characters, including a letter and a number."
+            description="8+ characters, with a letter and a number."
             disabled={isSubmitting}
           />
 
@@ -139,22 +176,21 @@ export const RegisterForm = () => {
             />
             <label
               htmlFor="register-legal"
-              className="min-w-0 flex-1 text-sm leading-relaxed font-normal text-muted-foreground"
+              className="min-w-0 flex-1 text-sm leading-snug font-normal text-muted-foreground"
             >
-              I confirm I am at least {SITE_INFO.minAge} years old and agree to
-              the{" "}
+              I am {SITE_INFO.minAge}+ and agree to the{" "}
               <Link
                 href="/terms"
-                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                className="font-medium text-foreground underline underline-offset-4 transition-colors duration-200 hover:text-primary"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Terms of Service
+                Terms
               </Link>{" "}
               and{" "}
               <Link
                 href="/privacy"
-                className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+                className="font-medium text-foreground underline underline-offset-4 transition-colors duration-200 hover:text-primary"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -163,14 +199,27 @@ export const RegisterForm = () => {
               .
             </label>
           </div>
+
+          {turnstile.enabled && turnstile.siteKey ? (
+            <TurnstileWidget
+              siteKey={turnstile.siteKey}
+              action="register"
+              onTokenChange={setTurnstileToken}
+            />
+          ) : null}
         </FieldGroup>
 
         {error ? <FieldError>{error}</FieldError> : null}
 
         <Button
           type="submit"
-          className="h-10 w-full"
-          disabled={isSubmitting || !acceptedLegal}
+          className="w-full"
+          disabled={
+            isSubmitting ||
+            !acceptedLegal ||
+            turnstile.isLoading ||
+            !turnstileReady
+          }
           aria-busy={isSubmitting}
         >
           {isSubmitting ? (

@@ -1,7 +1,7 @@
 "use client";
 
-import { EyeIcon, EyeOffIcon } from "lucide-react";
-import { useState, type ChangeEventHandler } from "react";
+import { EyeIcon, EyeOffIcon, LockIcon } from "lucide-react";
+import { useState, type ChangeEventHandler, type ReactNode } from "react";
 
 import { authControlClassName } from "@/components/auth/auth-field-styles";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
@@ -25,10 +25,11 @@ type PasswordFieldProps = {
   readonly minLength?: number;
   readonly description?: string;
   readonly disabled?: boolean;
+  readonly labelAction?: ReactNode;
 };
 
 /**
- * Password input with visibility toggle from ReUI c-card-12 / input-group.
+ * Password field with lock prefix + visibility toggle (ReUI input-group pattern).
  */
 export const PasswordField = ({
   id,
@@ -42,6 +43,7 @@ export const PasswordField = ({
   minLength,
   description,
   disabled = false,
+  labelAction,
 }: PasswordFieldProps) => {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -51,8 +53,14 @@ export const PasswordField = ({
 
   return (
     <Field>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <div className="flex items-center justify-between gap-3">
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        {labelAction}
+      </div>
       <InputGroup className={cn(authControlClassName)}>
+        <InputGroupAddon align="inline-start">
+          <LockIcon aria-hidden="true" />
+        </InputGroupAddon>
         <InputGroupInput
           id={id}
           name={name}

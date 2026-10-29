@@ -3,22 +3,20 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
-import { LoaderCircleIcon } from "lucide-react";
+import { LoaderCircleIcon, MailIcon } from "lucide-react";
 
 import { AuthCard } from "@/components/auth/auth-card";
-import { authControlClassName } from "@/components/auth/auth-field-styles";
+import { AuthTextField } from "@/components/auth/auth-text-field";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PasswordField } from "@/components/auth/password-field";
-import { Button } from "@/components/ui/button";
 import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+  resetTurnstileWidgets,
+  TurnstileWidget,
+} from "@/components/auth/turnstile-widget";
+import { Button } from "@/components/ui/button";
+import { FieldError, FieldGroup } from "@/components/ui/field";
+import { useTurnstileConfig } from "@/hooks/use-turnstile-config";
 import { ApiError } from "@/lib/api/client";
-import { cn } from "@/lib/utils";
 
 /**
  * Sign-in form body; wrapped for `useSearchParams` Suspense requirements.
@@ -27,22 +25,35 @@ const LoginFormContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
+  const turnstile = useTurnstileConfig();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const justRegistered = searchParams.get("registered") === "1";
+  const turnstileReady = !turnstile.enabled || Boolean(turnstileToken);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+
+    if (turnstile.enabled && !turnstileToken) {
+      setError("Complete the security check and try again.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, {
+        ...(turnstileToken ? { turnstileToken } : {}),
+      });
       router.replace("/dashboard");
     } catch (err) {
+      resetTurnstileWidgets();
+      setTurnstileToken(null);
       if (err instanceof ApiError) {
         setError(err.message);
       } else {
@@ -56,12 +67,12 @@ const LoginFormContent = () => {
   return (
     <AuthCard
       title="Sign in"
-      description="Enter your email and password to access your account."
+      description="Continue to your pipeline."
       footer={
         <>
           No account yet?{" "}
           <Link
-            className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+            className="font-medium text-foreground underline underline-offset-4 transition-colors duration-200 hover:text-primary"
             href="/register"
           >
             Create one
@@ -69,33 +80,31 @@ const LoginFormContent = () => {
         </>
       }
     >
-      <form className="grid gap-6" onSubmit={handleSubmit} noValidate>
+      <form className="grid gap-5" onSubmit={handleSubmit} noValidate>
         {justRegistered ? (
           <p
             className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-foreground"
             role="status"
           >
-            Account created successfully. Sign in with your new credentials.
+            Account created. Sign in to continue.
           </p>
         ) : null}
 
-        <FieldGroup>
-          <Field data-invalid={Boolean(error) || undefined}>
-            <FieldLabel htmlFor="login-email">Email address</FieldLabel>
-            <Input
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              aria-required="true"
-              disabled={isSubmitting}
-              className={cn(authControlClassName)}
-            />
-          </Field>
+        <FieldGroup className="gap-4">
+          <AuthTextField
+            id="login-email"
+            name="email"
+            label="Email"
+            icon={MailIcon}
+            type="email"
+            autoComplete="email"
+            placeholder="name@example.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+            disabled={isSubmitting}
+            invalid={Boolean(error)}
+          />
 
           <PasswordField
             id="login-password"
@@ -104,15 +113,31 @@ const LoginFormContent = () => {
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
             disabled={isSubmitting}
+            labelAction={
+              <Link
+                href="/forgot-password"
+                className="text-sm font-medium text-muted-foreground underline-offset-4 transition-colors duration-200 hover:text-foreground hover:underline"
+              >
+                Forgot password?
+              </Link>
+            }
           />
+
+          {turnstile.enabled && turnstile.siteKey ? (
+            <TurnstileWidget
+              siteKey={turnstile.siteKey}
+              action="login"
+              onTokenChange={setTurnstileToken}
+            />
+          ) : null}
         </FieldGroup>
 
         {error ? <FieldError>{error}</FieldError> : null}
 
         <Button
           type="submit"
-          className="h-10 w-full"
-          disabled={isSubmitting}
+          className="w-full"
+          disabled={isSubmitting || turnstile.isLoading || !turnstileReady}
           aria-busy={isSubmitting}
         >
           {isSubmitting ? (

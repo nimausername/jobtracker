@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { ApplicationFormSheet } from "@/components/applications/application-form-sheet";
 import { NeedsAttentionFrame } from "@/components/dashboard/needs-attention-frame";
 import { OverviewKpiRow } from "@/components/dashboard/overview-kpi-row";
@@ -22,6 +23,7 @@ import { getAttentionItems } from "@/lib/applications/attention";
  * Dashboard overview — KPIs, needs attention, and recent activity.
  */
 const DashboardPage = () => {
+  const { user } = useAuth();
   const [summary, setSummary] = useState<ApplicationSummary | null>(null);
   const [pipeline, setPipeline] = useState<Application[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +75,9 @@ const DashboardPage = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="font-heading text-2xl font-semibold tracking-tight">
-            Overview
+            {user?.firstName?.trim()
+              ? `Welcome back, ${user.firstName.trim()}`
+              : "Overview"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             What needs attention next in your search.

@@ -27,6 +27,8 @@ export class AccountService {
         id: user.id,
         email: user.email ?? null,
         name: user.name ?? null,
+        firstName: user.firstName ?? null,
+        lastName: user.lastName ?? null,
       },
       applications: applicationRows.map((row) => ({
         id: row.id,
