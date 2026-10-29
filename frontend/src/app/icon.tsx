@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 /**
- * App icon — avoids a broken favicon placeholder in the browser chrome.
+ * Single app favicon for Job Tracker (served at /icon).
  */
 export const size = {
   width: 32,
@@ -24,6 +24,7 @@ const Icon = () => {
           color: "#f6f8ff",
           fontSize: 18,
           fontWeight: 700,
+          letterSpacing: "-0.04em",
         }}
       >
         J

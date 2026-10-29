@@ -1,5 +1,4 @@
 import {
-  boolean,
   pgEnum,
   pgTable,
   text,
@@ -21,6 +20,24 @@ export const applicationStatusEnum = pgEnum("application_status", [
 ]);
 
 /**
+ * Timeline activity kinds on an application.
+ */
+export const applicationActivityKindEnum = pgEnum("application_activity_kind", [
+  "created",
+  "status_change",
+  "note",
+]);
+
+/**
+ * Where the role is expected to be performed.
+ */
+export const workArrangementEnum = pgEnum("work_arrangement", [
+  "onsite",
+  "hybrid",
+  "remote",
+]);
+
+/**
  * Job applications owned by a Keycloak user (`userId` = token `sub`).
  */
 export const applications = pgTable("applications", {
@@ -31,7 +48,9 @@ export const applications = pgTable("applications", {
   jobUrl: text("job_url"),
   city: varchar("city", { length: 120 }),
   country: varchar("country", { length: 120 }),
-  isRemote: boolean("is_remote").notNull().default(false),
+  workArrangement: workArrangementEnum("work_arrangement")
+    .notNull()
+    .default("onsite"),
   status: applicationStatusEnum("status").notNull().default("wishlist"),
   appliedAt: timestamp("applied_at", { withTimezone: true }),
   notes: text("notes"),
@@ -44,7 +63,7 @@ export const applications = pgTable("applications", {
 });
 
 /**
- * Timeline notes attached to an application.
+ * Timeline activities attached to an application (notes + system events).
  */
 export const applicationNotes = pgTable("application_notes", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -52,7 +71,10 @@ export const applicationNotes = pgTable("application_notes", {
     .notNull()
     .references(() => applications.id, { onDelete: "cascade" }),
   userId: varchar("user_id", { length: 128 }).notNull(),
+  kind: applicationActivityKindEnum("kind").notNull().default("note"),
   body: text("body").notNull(),
+  fromStatus: applicationStatusEnum("from_status"),
+  toStatus: applicationStatusEnum("to_status"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { ApplicationFormDialog } from "@/components/applications/application-form-dialog";
+import { ApplicationFormSheet } from "@/components/applications/application-form-sheet";
+import { NeedsAttentionFrame } from "@/components/dashboard/needs-attention-frame";
 import { OverviewKpiRow } from "@/components/dashboard/overview-kpi-row";
 import { RecentApplicationsFrame } from "@/components/dashboard/recent-applications-frame";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   createApplication,
   getApplicationsSummary,
@@ -16,14 +16,14 @@ import {
   type ApplicationInput,
   type ApplicationSummary,
 } from "@/lib/api/applications";
-import { cn } from "@/lib/utils";
+import { getAttentionItems } from "@/lib/applications/attention";
 
 /**
- * Dashboard overview — Frame-led KPI grid + recent applications.
+ * Dashboard overview — KPIs, needs attention, and recent activity.
  */
 const DashboardPage = () => {
   const [summary, setSummary] = useState<ApplicationSummary | null>(null);
-  const [recent, setRecent] = useState<Application[]>([]);
+  const [pipeline, setPipeline] = useState<Application[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -33,12 +33,12 @@ const DashboardPage = () => {
     setError(null);
 
     try {
-      const [summaryData, recentData] = await Promise.all([
+      const [summaryData, pipelineData] = await Promise.all([
         getApplicationsSummary(),
-        listApplications({ limit: 5 }),
+        listApplications({ limit: 50, sort: "updatedAt" }),
       ]);
       setSummary(summaryData);
-      setRecent(recentData);
+      setPipeline(pipelineData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load overview");
     } finally {
@@ -49,6 +49,13 @@ const DashboardPage = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const recent = useMemo(() => pipeline.slice(0, 5), [pipeline]);
+
+  const attentionItems = useMemo(
+    () => getAttentionItems(pipeline).slice(0, 6),
+    [pipeline],
+  );
 
   const handleAddApplication = () => {
     setDialogOpen(true);
@@ -69,20 +76,12 @@ const DashboardPage = () => {
             Overview
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Your job search pipeline at a glance.
+            What needs attention next in your search.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" type="button" onClick={handleAddApplication}>
-            Add application
-          </Button>
-          <Link
-            href="/dashboard/applications"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            View all
-          </Link>
-        </div>
+        <Button size="sm" type="button" onClick={handleAddApplication}>
+          Add application
+        </Button>
       </div>
 
       {error ? (
@@ -106,14 +105,17 @@ const DashboardPage = () => {
 
       <OverviewKpiRow summary={summary} isLoading={isLoading} />
 
-      <RecentApplicationsFrame
-        applications={recent}
-        isLoading={isLoading}
-        isEmpty={!isLoading && (summary?.total ?? 0) === 0}
-        onAddApplication={handleAddApplication}
-      />
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+        <NeedsAttentionFrame items={attentionItems} isLoading={isLoading} />
+        <RecentApplicationsFrame
+          applications={recent}
+          isLoading={isLoading}
+          isEmpty={!isLoading && (summary?.total ?? 0) === 0}
+          onAddApplication={handleAddApplication}
+        />
+      </div>
 
-      <ApplicationFormDialog
+      <ApplicationFormSheet
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSubmit={handleCreate}

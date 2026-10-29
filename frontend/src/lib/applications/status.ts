@@ -14,6 +14,30 @@ export const statusLabel: Record<ApplicationStatus, string> = {
 };
 
 /**
+ * Dot fill color for Linear-style status indicators.
+ */
+export const statusIndicatorClass: Record<ApplicationStatus, string> = {
+  wishlist: "bg-muted-foreground/70",
+  applied: "bg-info",
+  interview: "bg-warning",
+  offer: "bg-success",
+  rejected: "bg-destructive",
+  withdrawn: "bg-muted-foreground/50",
+};
+
+/**
+ * Text color for status-tinted stats (KPI values, etc.).
+ */
+export const statusToneClass: Record<ApplicationStatus, string> = {
+  wishlist: "text-muted-foreground",
+  applied: "text-info",
+  interview: "text-warning",
+  offer: "text-success",
+  rejected: "text-destructive",
+  withdrawn: "text-muted-foreground",
+};
+
+/**
  * shadcn Badge variant for a pipeline status (legacy UI badge).
  */
 export const statusBadgeVariant = (

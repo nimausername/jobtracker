@@ -42,7 +42,16 @@ type AuthSessionHandlers = {
   readonly onExpired?: () => void;
 };
 
-let refreshPromise: Promise<AuthSession | null> | null = null;
+/** Outcome of a cookie-backed session refresh attempt. */
+export type RefreshSessionResult =
+  | { readonly ok: true; readonly session: AuthSession }
+  | {
+      readonly ok: false;
+      /** `unauthorized` means the refresh cookie is gone/invalid; `transient` is network/5xx. */
+      readonly reason: "unauthorized" | "transient";
+    };
+
+let refreshPromise: Promise<RefreshSessionResult> | null = null;
 let authSessionHandlers: AuthSessionHandlers = {};
 
 /**
@@ -60,39 +69,52 @@ export const setAuthSessionHandlers = (
  * Does not clear auth state on failure — callers decide.
  */
 export const refreshSession = async (): Promise<AuthSession | null> => {
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  refreshPromise = (async (): Promise<AuthSession | null> => {
-    try {
-      const response = await fetch(`${getBaseUrl()}/v1/auth/refresh`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({}),
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const json = (await response.json()) as ApiSuccess<AuthSession>;
-      const session = json.data;
-      authSessionHandlers.onRefreshed?.(session);
-      return session;
-    } catch {
-      return null;
-    } finally {
-      refreshPromise = null;
-    }
-  })();
-
-  return refreshPromise;
+  const result = await refreshSessionDetailed();
+  return result.ok ? result.session : null;
 };
+
+/**
+ * Refreshes the session and distinguishes auth rejection from transient failures.
+ */
+export const refreshSessionDetailed =
+  async (): Promise<RefreshSessionResult> => {
+    if (refreshPromise) {
+      return refreshPromise;
+    }
+
+    refreshPromise = (async (): Promise<RefreshSessionResult> => {
+      try {
+        const response = await fetch(`${getBaseUrl()}/v1/auth/refresh`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({}),
+        });
+
+        if (response.status === 401 || response.status === 403) {
+          return { ok: false, reason: "unauthorized" };
+        }
+
+        if (!response.ok) {
+          return { ok: false, reason: "transient" };
+        }
+
+        const json = (await response.json()) as ApiSuccess<AuthSession>;
+        const session = json.data;
+        authSessionHandlers.onRefreshed?.(session);
+        return { ok: true, session };
+      } catch {
+        return { ok: false, reason: "transient" };
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+
+    return refreshPromise;
+  };
 
 /**
  * Typed JSON fetch against the Job Tracker API.
@@ -122,12 +144,21 @@ export const apiRequest = async <T>(
     options.auth !== false &&
     !options.skipRefresh
   ) {
-    const refreshed = await refreshSession();
-    if (refreshed) {
+    const refreshed = await refreshSessionDetailed();
+    if (refreshed.ok) {
       return apiRequest<T>(path, { ...options, skipRefresh: true });
     }
-    // Access rejected and refresh failed — session is gone.
-    authSessionHandlers.onExpired?.();
+    // Only clear the client session when the refresh cookie is actually invalid.
+    // Transient refresh failures must not log the user out.
+    if (refreshed.reason === "unauthorized") {
+      authSessionHandlers.onExpired?.();
+    } else {
+      throw new ApiError(
+        503,
+        "SESSION_REFRESH_TRANSIENT",
+        "Session refresh failed temporarily",
+      );
+    }
   }
 
   if (response.status === 204) {

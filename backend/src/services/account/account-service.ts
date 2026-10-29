@@ -35,7 +35,7 @@ export class AccountService {
         jobUrl: row.jobUrl,
         city: row.city,
         country: row.country,
-        isRemote: row.isRemote,
+        workArrangement: row.workArrangement,
         status: row.status,
         appliedAt: row.appliedAt?.toISOString() ?? null,
         notes: row.notes,

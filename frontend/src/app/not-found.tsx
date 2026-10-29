@@ -1,19 +1,19 @@
-import Link from "next/link";
-
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  StatusHomeLink,
+  StatusPage,
+} from "@/components/status/status-page";
 
 /**
- * Global 404 page.
+ * Global 404 page with branded ShapeWaves background.
  */
 const NotFoundPage = () => {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6">
-      <h1 className="font-heading text-2xl font-semibold">Page not found</h1>
-      <Link href="/" className={cn(buttonVariants())}>
-        Back home
-      </Link>
-    </main>
+    <StatusPage
+      maskText="404"
+      title="Page not found"
+      description="That route does not exist, or it moved. Head back home and pick up where you left off."
+      primaryAction={<StatusHomeLink />}
+    />
   );
 };
 

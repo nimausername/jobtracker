@@ -62,9 +62,9 @@ export const RecentApplicationsFrame = ({
       <FramePanel fit className="py-2.5">
         <div className="flex items-center justify-between gap-3">
           <FrameHeader className="min-w-0 px-0 py-0">
-            <FrameTitle>Recent</FrameTitle>
+            <FrameTitle>Recent activity</FrameTitle>
             <FrameDescription className="text-xs">
-              Latest updates across your pipeline.
+              Most recently updated applications.
             </FrameDescription>
           </FrameHeader>
           {!isEmpty ? (

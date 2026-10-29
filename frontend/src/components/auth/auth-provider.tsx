@@ -18,7 +18,7 @@ import {
   refreshRequest,
   registerRequest,
 } from "@/lib/api/auth";
-import { setAuthSessionHandlers } from "@/lib/api/client";
+import { ApiError, setAuthSessionHandlers } from "@/lib/api/client";
 import type { AuthSession, AuthUser } from "@/lib/api/types";
 
 /** Fallback when access lifetime is unknown (Keycloak default is often 300s). */
@@ -67,6 +67,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRefreshingRef = useRef(false);
+  const isBootstrappedRef = useRef(false);
   const userRef = useRef<AuthUser | null>(null);
 
   userRef.current = user;
@@ -152,12 +153,40 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         // Do not refresh immediately on load — that raced Keycloak rotation
         // and logged users out after hard refresh. Schedule a later refresh.
         scheduleRefresh(DEFAULT_ACCESS_TTL_SECONDS);
-      } catch {
-        if (!cancelled) {
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        const isUnauthorized =
+          error instanceof ApiError && error.status === 401;
+        // Definitive auth failure stays logged out. Transient me/refresh
+        // failures get one recovery attempt so a remount does not force login.
+        if (isUnauthorized) {
           setUser(null);
+        } else {
+          const session = await refreshRequest();
+          if (cancelled) {
+            return;
+          }
+          if (session) {
+            try {
+              const profile = await meRequest();
+              if (!cancelled) {
+                setUser(profile);
+                scheduleRefresh(session.expiresIn);
+              }
+              return;
+            } catch {
+              // Fall through to logged-out state.
+            }
+          }
+          if (!cancelled) {
+            setUser(null);
+          }
         }
       } finally {
         if (!cancelled) {
+          isBootstrappedRef.current = true;
           setIsLoading(false);
         }
       }
@@ -175,7 +204,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (document.visibilityState !== "visible" || !userRef.current) {
         return;
       }
-      if (isRefreshingRef.current) {
+      if (!isBootstrappedRef.current || isRefreshingRef.current) {
         return;
       }
 

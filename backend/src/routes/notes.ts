@@ -40,6 +40,27 @@ export const notesRoutes: FastifyPluginAsync<NotesRouteOptions> = async (
     });
   });
 
+  app.patch(
+    "/applications/:applicationId/notes/:noteId",
+    async (request) => {
+      const { applicationId, noteId } = request.params as {
+        applicationId: string;
+        noteId: string;
+      };
+      const body = parseOrThrow(createNoteBodySchema, request.body);
+      const data = await opts.notesService.update(
+        request.user.id,
+        applicationId,
+        noteId,
+        body,
+      );
+      return {
+        data,
+        meta: { requestId: request.id },
+      };
+    },
+  );
+
   app.delete(
     "/applications/:applicationId/notes/:noteId",
     async (request, reply) => {

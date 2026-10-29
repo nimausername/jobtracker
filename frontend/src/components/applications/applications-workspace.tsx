@@ -14,9 +14,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { ApplicationFormDialog } from "@/components/applications/application-form-dialog";
+import { ApplicationFormSheet } from "@/components/applications/application-form-sheet";
+import { ApplicationStatusSelect } from "@/components/applications/application-status-select";
 import { ConfirmDeleteDialog } from "@/components/applications/confirm-delete-dialog";
-import { Badge } from "@/components/reui/badge";
 import { Frame, FramePanel } from "@/components/reui/frame";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,14 +58,13 @@ import {
   deleteApplication,
   listApplications,
   updateApplication,
+  updateApplicationStatus,
   type Application,
   type ApplicationInput,
   type ApplicationStatus,
 } from "@/lib/api/applications";
-import {
-  pipelineBadgeVariant,
-  statusLabel,
-} from "@/lib/applications/status";
+import { statusLabel } from "@/lib/applications/status";
+import { formatWorkLocation } from "@/lib/applications/work-arrangement";
 
 const parseStatusParam = (
   value: string | null,
@@ -80,13 +79,12 @@ const parseStatusParam = (
   return "all";
 };
 
-const formatLocation = (item: Application): string => {
-  if (item.isRemote) {
-    return "Remote";
-  }
-
-  return [item.city, item.country].filter(Boolean).join(", ") || "—";
-};
+const formatLocation = (item: Application): string =>
+  formatWorkLocation({
+    workArrangement: item.workArrangement,
+    city: item.city,
+    country: item.country,
+  });
 
 /**
  * Applications list — Frame-led table workspace matching Overview language.
@@ -104,6 +102,9 @@ export const ApplicationsWorkspace = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Application | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Application | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     setStatus(parseStatusParam(searchParams.get("status")));
@@ -188,6 +189,58 @@ export const ApplicationsWorkspace = () => {
     const next = (value as ApplicationStatus | "all") ?? "all";
     setStatus(next);
     syncStatusToUrl(next);
+  };
+
+  const handleApplicationStatusChange = async (
+    application: Application,
+    nextStatus: ApplicationStatus,
+  ) => {
+    if (nextStatus === application.status) {
+      return;
+    }
+
+    const previousItems = items;
+    setStatusUpdatingId(application.id);
+    setItems((prev) => {
+      if (status !== "all" && nextStatus !== status) {
+        return prev.filter((item) => item.id !== application.id);
+      }
+
+      return prev.map((item) =>
+        item.id === application.id
+          ? { ...item, status: nextStatus }
+          : item,
+      );
+    });
+
+    try {
+      const updated = await updateApplicationStatus(
+        application.id,
+        nextStatus,
+      );
+      setItems((prev) => {
+        if (status !== "all" && updated.status !== status) {
+          return prev.filter((item) => item.id !== updated.id);
+        }
+
+        const exists = prev.some((item) => item.id === updated.id);
+        if (!exists) {
+          return prev;
+        }
+
+        return prev.map((item) =>
+          item.id === updated.id ? updated : item,
+        );
+      });
+      toast.success(`Moved to ${statusLabel[updated.status]}`);
+    } catch (err) {
+      setItems(previousItems);
+      toast.error(
+        err instanceof Error ? err.message : "Could not update status",
+      );
+    } finally {
+      setStatusUpdatingId(null);
+    }
   };
 
   const isEmpty = !isLoading && items.length === 0;
@@ -346,12 +399,17 @@ export const ApplicationsWorkspace = () => {
                         {formatLocation(item)}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={pipelineBadgeVariant(item.status)}
-                          radius="full"
-                        >
-                          {statusLabel[item.status]}
-                        </Badge>
+                        <ApplicationStatusSelect
+                          value={item.status}
+                          disabled={statusUpdatingId === item.id}
+                          aria-label={`Status for ${item.jobTitle} at ${item.companyName}`}
+                          onValueChange={(nextStatus) => {
+                            void handleApplicationStatusChange(
+                              item,
+                              nextStatus,
+                            );
+                          }}
+                        />
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -407,7 +465,7 @@ export const ApplicationsWorkspace = () => {
         </FramePanel>
       </Frame>
 
-      <ApplicationFormDialog
+      <ApplicationFormSheet
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         initial={editing}

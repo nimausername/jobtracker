@@ -55,10 +55,12 @@ export const buildApp = async (deps: AppDeps) => {
     deps.env,
     new LegalAcceptancesRepository(deps.db),
   );
+  const notesRepository = new NotesRepository(deps.db);
   const applicationsService = new ApplicationsService(
     new ApplicationsRepository(deps.db),
+    notesRepository,
   );
-  const notesService = new NotesService(new NotesRepository(deps.db));
+  const notesService = new NotesService(notesRepository);
 
   const keycloakUrls = createKeycloakUrls(deps.env);
   const keycloakTokenClient = new KeycloakTokenClient(deps.env, keycloakUrls);

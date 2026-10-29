@@ -40,6 +40,11 @@ export class ApplicationsRepository {
       );
     }
 
+    const sortColumn =
+      query.sort === "updatedAt"
+        ? applications.updatedAt
+        : applications.createdAt;
+
     if (query.cursor) {
       const cursorRow = await this.db.query.applications.findFirst({
         where: and(
@@ -49,7 +54,11 @@ export class ApplicationsRepository {
       });
 
       if (cursorRow) {
-        filters.push(lt(applications.createdAt, cursorRow.createdAt));
+        const cursorValue =
+          query.sort === "updatedAt"
+            ? cursorRow.updatedAt
+            : cursorRow.createdAt;
+        filters.push(lt(sortColumn, cursorValue));
       }
     }
 
@@ -57,7 +66,7 @@ export class ApplicationsRepository {
       .select()
       .from(applications)
       .where(and(...filters))
-      .orderBy(desc(applications.createdAt))
+      .orderBy(desc(sortColumn))
       .limit(query.limit + 1);
 
     const hasMore = items.length > query.limit;
@@ -116,7 +125,7 @@ export class ApplicationsRepository {
         jobUrl: emptyToNull(input.jobUrl),
         city: emptyToNull(input.city),
         country: emptyToNull(input.country),
-        isRemote: input.isRemote,
+        workArrangement: input.workArrangement,
         status: input.status,
         appliedAt: input.appliedAt ? new Date(input.appliedAt) : null,
         notes: emptyToNull(input.notes),
@@ -152,7 +161,9 @@ export class ApplicationsRepository {
         ...(input.country !== undefined
           ? { country: emptyToNull(input.country) }
           : {}),
-        ...(input.isRemote !== undefined ? { isRemote: input.isRemote } : {}),
+        ...(input.workArrangement !== undefined
+          ? { workArrangement: input.workArrangement }
+          : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
         ...(input.appliedAt !== undefined
           ? {

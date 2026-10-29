@@ -14,7 +14,7 @@ describe("application schemas", () => {
     });
 
     expect(parsed.status).toBe("wishlist");
-    expect(parsed.isRemote).toBe(false);
+    expect(parsed.workArrangement).toBe("onsite");
   });
 
   it("rejects an empty company name", () => {
@@ -29,6 +29,12 @@ describe("application schemas", () => {
   it("parses list query defaults", () => {
     const parsed = listApplicationsQuerySchema.parse({});
     expect(parsed.limit).toBe(20);
+    expect(parsed.sort).toBe("createdAt");
+  });
+
+  it("accepts updatedAt sort", () => {
+    const parsed = listApplicationsQuerySchema.parse({ sort: "updatedAt" });
+    expect(parsed.sort).toBe("updatedAt");
   });
 
   it("requires at least one field on update", () => {

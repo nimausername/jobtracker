@@ -9,6 +9,7 @@ import { AuthProvider } from "@/components/auth/auth-provider";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SITE_INFO } from "@/lib/legal/site-info";
 
 import "./globals.css";
 
@@ -32,8 +33,29 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Job Tracker",
-  description: "Track job applications in one place — open source and self-hosted.",
+  metadataBase: new URL(SITE_INFO.productionUrl),
+  title: {
+    default: SITE_INFO.productName,
+    template: `%s · ${SITE_INFO.productName}`,
+  },
+  description:
+    "Track job applications in one place — open source and self-hosted.",
+  applicationName: SITE_INFO.productName,
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: SITE_INFO.productionUrl,
+    siteName: SITE_INFO.productName,
+    title: SITE_INFO.productName,
+    description:
+      "Keep every application in one place. Track status, notes, and follow-ups — open source and self-hosted.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_INFO.productName,
+    description:
+      "Keep every application in one place. Track status, notes, and follow-ups — open source and self-hosted.",
+  },
 };
 
 export default function RootLayout({
