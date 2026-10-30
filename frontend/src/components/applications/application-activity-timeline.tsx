@@ -28,7 +28,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ApplicationNote } from "@/lib/api/notes";
 import { statusLabel } from "@/lib/applications/status";
 import { cn } from "@/lib/utils";
@@ -99,7 +98,7 @@ export const ApplicationActivityTimeline = ({
   }
 
   return (
-    <ScrollArea className="max-h-[min(28rem,calc(100dvh-26rem))] pr-3">
+    <div className="max-h-[min(28rem,calc(100dvh-26rem))] overflow-y-auto overscroll-contain pr-3">
       <Timeline
         className="px-1"
         defaultValue={activities.length}
@@ -179,6 +178,6 @@ export const ApplicationActivityTimeline = ({
           );
         })}
       </Timeline>
-    </ScrollArea>
+    </div>
   );
 };
